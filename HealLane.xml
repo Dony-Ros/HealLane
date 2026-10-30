@@ -1,0 +1,17 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+
+  <Script file="HealLane.lua" />
+  
+  <Script file="HealLaneConfig_App_General.lua" />
+  <Script file="HealLaneConfig_App_Healing.lua" />
+  <Script file="HealLaneConfig_App_Bars.lua" />
+  <Script file="HealLaneConfig_App_Icons.lua" />
+  <Script file="HealLaneConfig_App_Incoming.lua" />
+  
+  <Script file="HealLaneConfig.lua" />
+  <Script file="HealLaneConfig_Cure.lua" />
+  <Script file="HealLaneConfig_Buffs.lua" />
+
+</Ui>

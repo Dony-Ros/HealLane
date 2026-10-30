@@ -1,0 +1,7 @@
+## Interface: 30300
+## Title: HealLane
+## Author: Dony
+## Notes: nothing so far
+## Version: 0.0.1
+## SavedVariablesPerCharacter: EVS_SetingsHealCharacter
+HealLane.xml
