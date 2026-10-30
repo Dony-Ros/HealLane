@@ -14,4 +14,53 @@
   <Script file="HealLaneConfig_Cure.lua" />
   <Script file="HealLaneConfig_Buffs.lua" />
 
+
+<StatusBar name="HealLaneHealthBarTemplate" virtual="true">
+    <Size><AbsDimension x="125" y="50"/></Size>
+    <Layers>
+      <Layer level="BACKGROUND">
+        <Texture name="$parentBg" file="Interface\Buttons\WHITE8x8">
+          <Anchors>
+            <Anchor point="TOPLEFT"/>
+            <Anchor point="BOTTOMRIGHT"/>
+          </Anchors>
+        </Texture>
+      </Layer>
+    </Layers>
+    <BarTexture file="Interface\Buttons\WHITE8x8"/>
+    <BarColor r="0.2" g="0.9" b="0.2"/>
+  </StatusBar>
+
+  <Button name="HealLaneUnitButtonTemplate" virtual="true" inherits="SecureUnitButtonTemplate, SecureActionButtonTemplate">
+    <Size><AbsDimension x="125" y="50"/></Size>
+    <Frames>
+      <StatusBar name="$parentHealthBar" inherits="HealLaneHealthBarTemplate">
+        <Layers>
+          <Layer level="OVERLAY">
+            <FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="CENTER">
+              <Anchors>
+                <Anchor point="CENTER" relativePoint="CENTER"><Offset><AbsDimension x="0" y="5"/></Offset></Anchor>
+              </Anchors>
+            </FontString>
+            <FontString name="$parentHp" inherits="GameFontHighlightSmall" justifyH="CENTER">
+              <Anchors>
+                <Anchor point="CENTER" relativePoint="CENTER"><Offset><AbsDimension x="0" y="-6"/></Offset></Anchor>
+              </Anchors>
+            </FontString>
+          </Layer>
+        </Layers>
+        <Anchors>
+          <Anchor point="TOPLEFT" relativePoint="TOPLEFT"/>
+          <Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT"/>
+        </Anchors>
+      </StatusBar>
+    </Frames>
+    <Scripts>
+      <OnLoad>
+        HealLane_UnitButton_OnLoad(self)
+      </OnLoad>
+    </Scripts>
+  </Button>
+
+
 </Ui>

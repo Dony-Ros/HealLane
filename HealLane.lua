@@ -105,6 +105,7 @@ local activeCount = 0
 EvsHL.defaults = DEFAULTS
 EvsHL.mods = MODS
 EvsHL.simCount = 0
+
 local function Copy(v)
     if type(v) ~= "table" then return v end
     local t = {}
@@ -128,20 +129,27 @@ local function NumRaid()
     return GetNumRaidMembers()
 end
 
-local function IsTank(unit)
-    local isTank, _, _ = UnitGroupRolesAssigned(unit)
-    if isTank then return true end
+local function AssignedRole(unit)
+    if not UnitGroupRolesAssigned then return nil end
+    local role, isHeal, isDPS = UnitGroupRolesAssigned(unit)
+    if type(role) == "string" then return string.upper(role) end
+    if role then return "TANK" end
+    if isHeal then return "HEALER" end
+    if isDPS then return "DAMAGER" end
 end
 
-local function IsHeal(unit)
-    local _, isHeal, _ = UnitGroupRolesAssigned(unit)
-    if isHeal then return true end
+local function UnitRole(unit)
+    local guid = UnitGUID and UnitGUID(unit)
+    local override = guid and S and S.roleOverrides and S.roleOverrides[guid]
+    if override == "TANK" or override == "HEALER" then return override end
+    local role = AssignedRole(unit)
+    if role == "TANK" or role == "HEALER" then return role end
+    return "DPS"
 end
 
-local function IsDPS(unit)
-    local _, _, isDPS = UnitGroupRolesAssigned(unit)
-    if isDPS then return true end
-end
+local function IsTank(unit) return UnitRole(unit) == "TANK" end
+local function IsHeal(unit) return UnitRole(unit) == "HEALER" end
+local function IsDPS(unit) return UnitRole(unit) == "DPS" end
 -- 1 = tank, 2 = player, 3 = healer, 4 = everyone else
 local function RolePriority(unit)
     if not UnitExists(unit) then return 4 end
@@ -403,7 +411,7 @@ end
 
 function EvsHL.ApplyVisuals()
     if not S then return end
-   
+
     parentFrame:SetScale(S.scale)
     if S.showBorder then
         parentFrame:SetBackdrop({ bgFile = FLAT, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
@@ -411,24 +419,27 @@ function EvsHL.ApplyVisuals()
     else
         parentFrame:SetBackdrop({ bgFile = FLAT })
     end
+
     parentFrame:SetBackdropColor(0, 0, 0, S.bgAlpha)
     if S.locked then handle:Hide() else handle:Show() end
     EvsHL.ver = (EvsHL.ver or 0) + 1
     if not S.showIncoming then pendingCast = nil end
+
     for _, btn in pairs(buttons) do
-        btn:SetBackdropColor(0.08, 0.08, 0.08, S.btnAlpha)
         if not S.showIncoming then
             btn.incoming = nil
             btn.incomingSpell = nil
             btn.incomingEnd = nil
             btn.incomingBar:Hide()
         end
+        btn.healthBar.bg:SetVertexColor(0.08, 0.08, 0.08, S.btnAlpha)
         btn.roleIcon:SetWidth(20 * (S.roleIconScale or 1))
         btn.roleIcon:SetHeight(20 * (S.roleIconScale or 1))
         btn.raidTargetIcon:SetWidth(16 * (S.raidIconScale or 1))
         btn.raidTargetIcon:SetHeight(16 * (S.raidIconScale or 1))
         PositionMarker(btn.roleIcon, S.roleIconAnchor or "TOPRIGHT")
         PositionMarker(btn.raidTargetIcon, S.raidTargetIconAnchor or "TOP")
+
         btn.font:ClearAllPoints()
         btn.hpText:ClearAllPoints()
         if S.hpMode ~= "none" then
@@ -444,7 +455,7 @@ function EvsHL.ApplyVisuals()
             for _, txt in ipairs(btn.hotTexts) do txt:Hide() end
         end
         if btn.debuff then
-           if not S.debuffBorder then btn.debuff:Hide() end
+            if not S.debuffBorder then btn.debuff:Hide() end
         end
         if btn.buff then
             if not S.buffBorder then btn.buff:Hide() end
@@ -466,7 +477,6 @@ local function Tooltip(entry)
 end
 
 local function HealAmount(spell)
-    
     local entry = FindSpell(spell)
     if not entry or not entry.helpful then return end
     Tooltip(entry)
@@ -520,7 +530,8 @@ local function Fmt(n)
 end
 
 local SIM_NAMES = { "Awezon", "Aldrin", "Mirelle", "Torvald", "Selene", "Brokk", "Isolde", "Garrick", "Nyx", "Orin" }
-local SIM_CLASSES = { "DRUID", "PRIEST", "PALADIN", "SHAMAN", "WARRIOR", "MAGE", "ROGUE", "HUNTER", "WARLOCK", "DEATHKNIGHT" }
+local SIM_CLASSES = { "DRUID", "PRIEST", "PALADIN", "SHAMAN", "WARRIOR", "MAGE", "ROGUE", "HUNTER", "WARLOCK",
+    "DEATHKNIGHT" }
 local SIM_MAX = { 1016, 850, 3400, 12400, 24000, 6200, 15800 }
 local SIM_ICONS = { "Interface\\Icons\\Spell_Nature_Rejuvenation", "Interface\\Icons\\Spell_Holy_Renew",
     "Interface\\Icons\\Spell_Nature_ResistNature" }
@@ -560,7 +571,7 @@ local function RealData(btn)
     -- DEBUFFS --
     btn.debuff = nil
     btn.debuffIconTexture = nil
-    
+
     if (S.debuffBorder or S.debuffIcon) and S.dispel and S.dispel.spells then
         for i = 1, 40 do
             local name, _, icon, _, debuffType = UnitDebuff(unit, i)
@@ -678,10 +689,10 @@ local function UpdateHoTs(btn, now)
 end
 
 local function HpText(btn)
+    if btn.dead then return "Dead" end
     local mode = S.hpMode
     if mode == "none" then return "" end
     if not btn.online then return "Offline" end
-    if btn.dead then return "Dead" end
     if mode == "max" then return Fmt(btn.max) end
     if mode == "current" then return Fmt(btn.health) end
     if mode == "percent" then return btn.max > 0 and (math.floor(btn.health / btn.max * 100 + 0.5) .. "%") or "" end
@@ -691,28 +702,37 @@ end
 
 local function UpdateHealth(btn)
     local bar = btn.healthBar
-    if not btn.online or btn.dead or not btn.max or btn.max == 0 then
-        bar:Hide()
-    else
-       
-        local color = S.barColor
-        local fullHealth = btn.health >= btn.max
-        if not fullHealth then
-            if btn.hasAggro then
-                color = { 0.1, 1, 0.1 }
-            elseif btn.health / btn.max < (S.healthThreshold or 95) / 100 then
-                color = S.thresholdColor or { 0.1, 1, 0.1 }
-            end
-        end
-        local alpha = fullHealth and S.barAlphaFull or S.barAlpha
-        bar:SetVertexColor(color[1], color[2], color[3], alpha)
-        bar:Show()
+    local maxHealth = btn.max and btn.max > 0 and btn.max or 1
+    local health = btn.health and math.max(0, math.min(btn.health, maxHealth)) or 0
+    local validHealth = btn.online and not btn.dead and btn.max and btn.max > 0
+    if btn._barMax ~= maxHealth then
+        btn._barMax = maxHealth
+        bar:SetMinMaxValues(0, maxHealth)
     end
+    bar:SetValue(validHealth and health or 0)
+
+    local color = S.barColor
+    local fullHealth = validHealth and health >= maxHealth
+    if validHealth and not fullHealth then
+        if btn.hasAggro then
+            color = { 0.1, 1, 0.1 }
+        elseif health / maxHealth < (S.healthThreshold or 95) / 100 then
+            color = S.thresholdColor or { 0.1, 1, 0.1 }
+        end
+    end
+    local alpha = validHealth and (fullHealth and S.barAlphaFull or S.barAlpha) or 0
+    bar:SetStatusBarColor(color[1], color[2], color[3])
+    bar.fill:SetAlpha(alpha)
+    bar:Show()
     btn.hpText:SetText(HpText(btn))
+    if btn.dead or S.hpMode ~= "none" then
+        btn.hpText:Show()
+    else
+        btn.hpText:Hide()
+    end
 end
 
 local function UpdateIncoming(btn, now)
-    
     if not S.showIncoming then
         btn.incoming = nil
         btn.incomingSpell = nil
@@ -739,11 +759,13 @@ local function UpdateIncoming(btn, now)
     end
     btn.incomingBar:ClearAllPoints()
     if S.barsAnchor == "RIGHT" then
-        btn.incomingBar:SetPoint("TOPRIGHT", btn.healthBar, "TOPLEFT", 0, 0)
-        btn.incomingBar:SetPoint("BOTTOMRIGHT", btn.healthBar, "BOTTOMLEFT", 0, 0)
+        local offset = -btn:GetWidth() * (1 - btn.health / btn.max)
+        btn.incomingBar:SetPoint("TOPRIGHT", btn, "TOPRIGHT", offset, 0)
+        btn.incomingBar:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", offset, 0)
     else
-        btn.incomingBar:SetPoint("TOPLEFT", btn.healthBar, "TOPRIGHT", 0, 0)
-        btn.incomingBar:SetPoint("BOTTOMLEFT", btn.healthBar, "BOTTOMRIGHT", 0, 0)
+        local offset = btn:GetWidth() * btn.health / btn.max
+        btn.incomingBar:SetPoint("TOPLEFT", btn, "TOPLEFT", offset, 0)
+        btn.incomingBar:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", offset, 0)
     end
     btn.incomingBar:SetWidth(w)
     btn.incomingBar:SetVertexColor(S.incomingColor[1], S.incomingColor[2], S.incomingColor[3], 0.6)
@@ -751,7 +773,6 @@ local function UpdateIncoming(btn, now)
 end
 
 local function UpdateName(btn)
-    
     btn.name = UnitName(btn.unit)
     local _, class = UnitClass(btn.unit)
     btn.class = class
@@ -769,7 +790,6 @@ local function UpdateName(btn)
 end
 
 local function UpdateDebuff(btn)
-    
     local foundType, foundIcon = nil, nil
     for i = 1, 40 do
         local name, _, icon, _, debuffType = UnitDebuff(btn.unit, i)
@@ -794,10 +814,10 @@ local function UpdateDebuff(btn)
     if foundType then
         local color = S[DEBUFF_COLOR_KEYS[foundType]]
         local fallback = DEBUFF_TYPE_COLORS[foundType] or { r = 1, g = 0, b = 0 }
-        btn:SetBackdropColor(color and color[1] or fallback.r, color and color[2] or fallback.g,
+        btn.healthBar.bg:SetVertexColor(color and color[1] or fallback.r, color and color[2] or fallback.g,
             color and color[3] or fallback.b, 1)
     else
-        btn:SetBackdropColor(0.08, 0.08, 0.08, S.btnAlpha)
+        btn.healthBar.bg:SetVertexColor(0.08, 0.08, 0.08, S.btnAlpha)
     end
 
     if btn.debuff then
@@ -846,13 +866,17 @@ local Raid_Textures = {
     [7] = [[Interface\Addons\HealLane\Textures\raid\1\cross.tga]],
     [8] = [[Interface\Addons\HealLane\Textures\raid\1\skull.tga]],
 }
+local function IsGrouped()
+    return NumRaid() > 0 or NumParty() > 0
+end
+
 local function UpdateUnitRoleIcon(btn)
     if btn.sim or not btn.unit then
         btn.roleIcon:Hide()
         btn.raidTargetIcon:Hide()
         return
     end
-    if not S.showRoleIcon then
+    if not S.showRoleIcon or not IsGrouped() then
         btn.roleIcon:Hide()
         return
     end
@@ -876,7 +900,7 @@ local function UpdateUnitRaidIcon(btn)
         btn.raidTargetIcon:Hide()
         return
     end
-    if not S.showRaidIcon then
+    if not S.showRaidIcon or not IsGrouped() then
         btn.raidTargetIcon:Hide()
         return
     end
@@ -901,7 +925,6 @@ local function ThreatLevel(unit)
         return status
     end
 end
-
 local function UpdateButton(btn)
     local now = GetTime()
     if btn.sim then SimData(btn) else RealData(btn) end
@@ -931,13 +954,11 @@ local function UpdateButton(btn)
         end
     end
     btn:SetAlpha(rangeAlpha)
-    
     UpdateHealth(btn)
     UpdateIncoming(btn, now)
     UpdateHoTs(btn, now)
     UpdateDebuff(btn)
     UpdateBuff(btn)
-
     if btn.hasAggro then
         btn.aggro:SetBackdropBorderColor(1, 0, 0, 1)
         btn.aggro:Show()
@@ -990,6 +1011,8 @@ local function ShowRoleMenu(btn)
                 else
                     S.roleOverrides[guid] = "TANK"
                 end
+                btn.role = UnitRole(unit)
+                UpdateUnitRoleIcon(btn)
                 orderCacheDirty = true
                 EvsHL.Refresh()
             end
@@ -1006,6 +1029,8 @@ local function ShowRoleMenu(btn)
                 else
                     S.roleOverrides[guid] = "HEALER"
                 end
+                btn.role = UnitRole(unit)
+                UpdateUnitRoleIcon(btn)
                 orderCacheDirty = true
                 EvsHL.Refresh()
             end
@@ -1053,14 +1078,12 @@ local function ShowUnitMenu(btn)
 end
 
 local function CreateUnitButton(index)
-    local btn = CreateFrame("Button", "PartyHealButton" .. index, parentFrame, "SecureUnitButtonTemplate, SecureActionButtonTemplate")
+    local btn = CreateFrame("Button", "PartyHealButton" .. index, parentFrame, "HealLaneUnitButtonTemplate")
     btn:RegisterForClicks("AnyUp")
     btn:EnableMouseWheel(true)
     btn:SetScript("OnMouseWheel", function(self)
         if IsShiftKeyDown() then ShowRoleMenu(self) end
     end)
-    btn:SetBackdrop({ bgFile = FLAT })
-    btn:SetBackdropColor(0.08, 0.08, 0.08, 0.35)
     btn.hots = { hots = {} }
     btn.menu = ShowUnitMenu
 
@@ -1068,30 +1091,20 @@ local function CreateUnitButton(index)
     btn:HookScript("PreClick", SmartCast_PreClick)
     btn:HookScript("PostClick", SmartCast_PostClick)
 
-    local healthBar = btn:CreateTexture(nil, "BACKGROUND")
-    healthBar:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
-    healthBar:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 0, 0)
-    healthBar:SetTexture(FLAT)
-    btn.healthBar = healthBar
-
-    local incomingBar = btn:CreateTexture(nil, "BACKGROUND")
-    incomingBar:SetPoint("TOPLEFT", healthBar, "TOPRIGHT", 0, 0)
-    incomingBar:SetPoint("BOTTOMLEFT", healthBar, "BOTTOMRIGHT", 0, 0)
+    local incomingBar = btn.healthBar:CreateTexture(nil, "ARTWORK")
+    incomingBar:SetPoint("TOPLEFT", btn.healthBar, "TOPLEFT")
+    incomingBar:SetPoint("BOTTOMLEFT", btn.healthBar, "BOTTOMLEFT")
     incomingBar:SetTexture(FLAT)
     incomingBar:Hide()
     btn.incomingBar = incomingBar
 
-    btn.font = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    btn.font:SetHeight(11)
-    btn.hpText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-
-    btn.roleIcon = btn:CreateTexture(nil, "OVERLAY")
+    btn.roleIcon = btn.healthBar:CreateTexture(nil, "OVERLAY")
     btn.roleIcon:SetWidth(20)
     btn.roleIcon:SetHeight(20)
     btn.roleIcon:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -2, -2)
     btn.roleIcon:Hide()
 
-    btn.raidTargetIcon = btn:CreateTexture(nil, "OVERLAY")
+    btn.raidTargetIcon = btn.healthBar:CreateTexture(nil, "OVERLAY")
     btn.raidTargetIcon:SetWidth(16)
     btn.raidTargetIcon:SetHeight(16)
     btn.raidTargetIcon:SetPoint("TOP", btn, "TOP", 0, -1)
@@ -1140,7 +1153,7 @@ local function CreateUnitButton(index)
 
     btn.hotIcons, btn.hotTexts = {}, {}
     for i = 1, MAX_HOTS do
-        local icon = btn:CreateTexture(nil, "ARTWORK")
+        local icon = btn.healthBar:CreateTexture(nil, "OVERLAY")
         icon:Hide()
         btn.hotIcons[i] = icon
         local txt = btn:CreateFontString(nil, "OVERLAY")
@@ -1184,7 +1197,6 @@ end
 
 function EvsHL.Refresh()
     if not S then return end
-    
     if InCombatLockdown() then
         pending = true
         return
@@ -1228,7 +1240,6 @@ function EvsHL.Refresh()
         end)
     end
     orderSignature = table.concat(list, ",")
-
     for i = 1, MAX_UNITS do
         local btn = buttons[i] or CreateUnitButton(i)
         local unit = list[i]
@@ -1237,6 +1248,12 @@ function EvsHL.Refresh()
             btn:SetHeight(S.height)
             btn.font:SetWidth(math.max(S.width - 4, 10))
             btn:ClearAllPoints()
+            if btn._barAnchor ~= S.barsAnchor then
+                btn._barAnchor = S.barsAnchor
+                if btn.healthBar.SetReverseFill then
+                    btn.healthBar:SetReverseFill(S.barsAnchor == "RIGHT")
+                end
+            end
 
             -- Stack tanks and healers in the first column, then place DPS in columns beside them.
             local xPos, yPos
@@ -1297,25 +1314,10 @@ function EvsHL.Refresh()
                 else
                     btn.role = "DPS"
                 end
-                
-                 -- If barsAnchor is RIGHT, the bar should anchor to the right side
-                if S.barsAnchor == "RIGHT" then
-                    btn.healthBar:ClearAllPoints()
-                    btn.healthBar:SetPoint("TOPRIGHT", btn, "TOPRIGHT", 0, 0)
-                    btn.healthBar:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
-                    btn.healthBar:SetWidth(math.max(btn:GetWidth() * btn.health / btn.max, 0.01))
-                else
-                    btn.healthBar:ClearAllPoints()
-                    btn.healthBar:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
-                    btn.healthBar:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 0, 0)
-                    btn.healthBar:SetWidth(math.max(btn:GetWidth() * btn.health / btn.max, 0.01))
-                end
 
                 UpdateUnitRoleIcon(btn)
                 UpdateUnitRaidIcon(btn)
                 UpdateName(btn)
-
-
             end
             btn.shownName = nil
         else
@@ -1327,7 +1329,6 @@ function EvsHL.Refresh()
             btn:Hide()
         end
     end
-
     activeCount = #list
     local total = math.max(#list, 1)
     local rows = math.max(roleRowCount or math.ceil(total / cols), 1)
@@ -1502,6 +1503,19 @@ local function Init()
     EvsHL.S = S
     EvsHL.ApplyPosition()
 end
+function HealLane_UnitButton_OnLoad(self)
+    local name = self:GetName()
+    self.healthBar = _G[name .. "HealthBar"]
+    assert(self.healthBar, "HealLane unit button is missing its HealthBar template region")
+    self.healthBar.bg = _G[name .. "HealthBarBg"]
+    assert(self.healthBar.bg, "HealLane health bar is missing its background texture")
+    self.healthBar.fill = self.healthBar:GetStatusBarTexture()
+    assert(self.healthBar.fill, "HealLane health bar is missing its status texture")
+    self.font = _G[name .. "HealthBarName"]
+    assert(self.font, "HealLane unit button is missing its name font string")
+    self.hpText = _G[name .. "HealthBarHp"]
+    assert(self.hpText, "HealLane unit button is missing its health font string")
+end
 
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
@@ -1534,17 +1548,21 @@ end
 frame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
     if event == "ADDON_LOADED" then
         if arg1 == "HealLane" then Init() end
+        
     elseif event == "PLAYER_REGEN_ENABLED" then
         if pending then EvsHL.Refresh() end
     elseif event == "UNIT_SPELLCAST_SENT" then
-        if arg1 == "player" and S and S.showIncoming then
+        if not S.showIncoming then return end
+        if arg1 == "player" then
             pendingCast = { spell = arg2, target = arg4 }
         else
             pendingCast = nil
         end
     elseif event == "UNIT_SPELLCAST_START" then
+        if not S.showIncoming then return end
         if arg1 == "player" then StartIncoming(arg2) end
     elseif event == "UNIT_SPELLCAST_DELAYED" then
+        if not S.showIncoming then return end
         if arg1 == "player" then
             local _, _, _, _, _, endTime = UnitCastingInfo("player")
             for _, btn in pairs(buttons) do
@@ -1552,6 +1570,7 @@ frame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
             end
         end
     elseif event == "UNIT_SPELLCAST_STOP" or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_INTERRUPTED" then
+        if not S.showIncoming then return end
         if arg1 == "player" then
             ClearIncoming(arg2)
             pendingCast = nil
