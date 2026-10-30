@@ -454,9 +454,7 @@ function EvsHL.ApplyVisuals()
             for _, icon in ipairs(btn.hotIcons) do icon:Hide() end
             for _, txt in ipairs(btn.hotTexts) do txt:Hide() end
         end
-        if btn.debuff then
-            if not S.debuffBorder then btn.debuff:Hide() end
-        end
+        if not S.debuffBorder then btn.debuffBorder:Hide() end
         if btn.buff then
             if not S.buffBorder then btn.buff:Hide() end
         end
@@ -536,29 +534,29 @@ local SIM_MAX = { 1016, 850, 3400, 12400, 24000, 6200, 15800 }
 local SIM_ICONS = { "Interface\\Icons\\Spell_Nature_Rejuvenation", "Interface\\Icons\\Spell_Holy_Renew",
     "Interface\\Icons\\Spell_Nature_ResistNature" }
 
-local function SimData(btn, d)
+local function SimData(btn)
     local i = btn.sim
     local now = GetTime()
-    d.name = SIM_NAMES[(i - 1) % #SIM_NAMES + 1]
-    d.class = SIM_CLASSES[(i * 3) % #SIM_CLASSES + 1]
-    d.max = SIM_MAX[i % #SIM_MAX + 1]
-    d.online = i ~= 7
-    d.dead = i == 3
+    btn.name = SIM_NAMES[(i - 1) % #SIM_NAMES + 1]
+    btn.class = SIM_CLASSES[(i * 3) % #SIM_CLASSES + 1]
+    btn.max = SIM_MAX[i % #SIM_MAX + 1]
+    btn.online = i ~= 7
+    btn.dead = i == 3
     local pct = 1
     if i % 5 ~= 1 then pct = math.min(0.4 + ((i * 37) % 55) / 100 + 0.04 * math.sin(now * 0.8 + i), 0.99) end
-    d.health = math.floor(d.max * pct)
-    d.debuff = (i % 6 == 2 and "Magic") or (i % 9 == 4 and "Poison") or nil
-    d.missingBuff = (i % 4 == 1) -- Simulate missing buff
-    d.nh = i % 4
-    for k = 1, d.nh do
-        local h = d.hots[k] or {}
-        d.hots[k] = h
+    btn.health = math.floor(btn.max * pct)
+    btn.debuff = (i % 6 == 2 and "Magic") or (i % 9 == 4 and "Poison") or nil
+    btn.missingBuff = (i % 4 == 1) -- Simulate missing buff
+    btn.nh = i % 4
+    for k = 1, btn.nh do
+        local h = btn.hots[k] or {}
+        btn.hots[k] = h
         h.duration = 12
         h.expires = now + 12 - ((now + i * 3 + k * 4) % 12)
         h.icon = SIM_ICONS[k]
-        h.rate = d.max * 0.02
+        h.rate = btn.max * 0.02
     end
-    d.cast = (i % 3 == 0) and d.max * 0.2 or 0
+    btn.cast = (i % 3 == 0) and btn.max * 0.2 or 0
 end
 
 local function RealData(btn)
@@ -820,15 +818,15 @@ local function UpdateDebuff(btn)
         btn.healthBar.bg:SetVertexColor(0.08, 0.08, 0.08, S.btnAlpha)
     end
 
-    if btn.debuff then
+    if btn.debuffBorder then
         if S.debuffBorder and foundType then
             local color = S[DEBUFF_COLOR_KEYS[foundType]]
             local fallback = DEBUFF_TYPE_COLORS[foundType] or { r = 1, g = 1, b = 1 }
-            btn.debuff:SetBackdropBorderColor(color and color[1] or fallback.r, color and color[2] or fallback.g,
+            btn.debuffBorder:SetBackdropBorderColor(color and color[1] or fallback.r, color and color[2] or fallback.g,
                 color and color[3] or fallback.b, 1)
-            btn.debuff:Show()
+            btn.debuffBorder:Show()
         else
-            btn.debuff:Hide()
+            btn.debuffBorder:Hide()
         end
     end
 
@@ -1084,7 +1082,7 @@ local function CreateUnitButton(index)
     btn:SetScript("OnMouseWheel", function(self)
         if IsShiftKeyDown() then ShowRoleMenu(self) end
     end)
-    btn.hots = { hots = {} }
+    btn.hots = {}
     btn.menu = ShowUnitMenu
 
     -- Hook Secure Action Click for Smart Casting
@@ -1114,7 +1112,7 @@ local function CreateUnitButton(index)
     debuff:SetAllPoints(btn)
     debuff:SetBackdrop({ edgeFile = FLAT, edgeSize = 1 })
     debuff:Hide()
-    btn.debuff = debuff
+    btn.debuffBorder = debuff
 
     local aggro = CreateFrame("Frame", nil, btn)
     aggro:SetAllPoints(btn)
