@@ -136,38 +136,4 @@ function EvsHL.BuildCureTab(page)
         end)
     end
 
-    -- Resurrection spell
-    H.Label(page, "Smart Cast Resurrection Spell", 25, -260)
-    H.Label(page, "Cast automatically when clicking a dead unit.", 25, -276)
-
-    local resBtn = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-    resBtn:SetWidth(260)
-    resBtn:SetHeight(24)
-    resBtn:SetPoint("TOPLEFT", 25, -295)
-    local resIcon = resBtn:CreateTexture(nil, "ARTWORK")
-    resIcon:SetWidth(18)
-    resIcon:SetHeight(18)
-    resIcon:SetPoint("LEFT", 5, 0)
-    local resText = resBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    resText:SetPoint("LEFT", resIcon, "RIGHT", 8, 0)
-
-    local function UpdateResBtn()
-        local val = S.resSpell
-        if val and val ~= "" then
-            resIcon:SetTexture(GetSpellTexture(val))
-            resText:SetText(val)
-        else
-            resIcon:SetTexture(nil)
-            resText:SetText("Click to pick a resurrection spell...")
-        end
-    end
-    UpdateResBtn()
-
-    resBtn:SetScript("OnClick", function()
-        H.OpenPicker(false, "Pick Resurrection Spell", function(e)
-            S.resSpell = e.name
-            UpdateResBtn()
-        end)
-    end)
-    EvsHL.AddConfigWidget(UpdateResBtn)
 end

@@ -49,6 +49,7 @@ local DEFAULTS = {
     dispel = { spells = {} },
     resSpell = "",
     trackBuffs = {},
+    monitorMissingBuffs = true,
     checkBuffsInCombat = false,
     buffsMissingColor = { 1, 0.5, 0 },
     debuffColor = { 1, 0, 0 },
@@ -236,7 +237,7 @@ local function SmartCast_PreClick(self, button, down)
     if not S then return end
     local unit = self.unit
     if not unit or self.sim or InCombatLockdown() then return end
-    if unit == "target" and not UnitInParty(unit) and not UnitInRaid(unit) then return end
+    local isGroupUnit = unit ~= "target" or UnitInParty(unit) or UnitInRaid(unit)
 
     if S.smartCast then
         -- 1. Resurrection (Dead check)
@@ -255,7 +256,7 @@ local function SmartCast_PreClick(self, button, down)
         end
 
         -- 2. Dispel (Debuff check)
-        if S.dispel and S.dispel.spells then
+        if isGroupUnit and S.dispel and S.dispel.spells then
             for _, entry in pairs(S.dispel.spells) do
                 local spellName = entry.spell
                 if spellName and spellName ~= "" then
@@ -283,7 +284,8 @@ local function SmartCast_PreClick(self, button, down)
 
         -- 3. Missing Buffs
         local unitInCombat = UnitAffectingCombat and UnitAffectingCombat(unit)
-        if S.trackBuffs and next(S.trackBuffs) and (S.checkBuffsInCombat or not unitInCombat) then
+        if S.monitorMissingBuffs and S.trackBuffs and next(S.trackBuffs)
+            and (S.checkBuffsInCombat or not unitInCombat) then
             local buffs = {}
             for i = 1, 40 do
                 local name = UnitBuff(unit, i)
@@ -546,7 +548,7 @@ local function SimData(btn)
     if i % 5 ~= 1 then pct = math.min(0.4 + ((i * 37) % 55) / 100 + 0.04 * math.sin(now * 0.8 + i), 0.99) end
     btn.health = math.floor(btn.max * pct)
     btn.debuff = (i % 6 == 2 and "Magic") or (i % 9 == 4 and "Poison") or nil
-    btn.missingBuff = (i % 4 == 1) -- Simulate missing buff
+    btn.missingBuff = S.monitorMissingBuffs and (i % 4 == 1) or false -- Simulate missing buff
     btn.nh = i % 4
     for k = 1, btn.nh do
         local h = btn.hots[k] or {}
@@ -590,7 +592,8 @@ local function RealData(btn)
     -- BUFFS --
     btn.missingBuff = false
     local unitInCombat = UnitAffectingCombat and UnitAffectingCombat(unit)
-    if S.trackBuffs and next(S.trackBuffs) and (S.checkBuffsInCombat or not unitInCombat) then
+    if S.monitorMissingBuffs and S.trackBuffs and next(S.trackBuffs)
+        and (S.checkBuffsInCombat or not unitInCombat) then
         local buffs = {}
         for i = 1, MAX_UNITS do
             local name = UnitBuff(unit, i)
@@ -1278,6 +1281,7 @@ function EvsHL.Refresh()
                     btn.watched = false
                 end
                 btn:Show()
+                UpdateName(btn)
             elseif unit == "target" then
                 btn.sim = nil
                 btn.unit = "target"
@@ -1290,6 +1294,7 @@ function EvsHL.Refresh()
                 RegisterUnitWatch(btn)
                 btn.watched = true
                 btn:Show()
+                UpdateName(btn)
             else
                 btn.sim = nil
                 btn.unit = unit

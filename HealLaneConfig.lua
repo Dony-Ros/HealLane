@@ -256,7 +256,6 @@ local function BuildGeneral(page)
     H.AddCheck(page, "Debuff outline", 20, -122, "debuffBorder", Visuals)
     H.AddCheck(page, "Class colored names", 20, -150, "classColor", Visuals)
     H.AddCheck(page, "Container border", 20, -178, "showBorder", Visuals)
-    H.AddCheck(page, "Incoming heals", 20, -206, "showIncoming", Visuals)
     H.AddCheck(page, "Sort: tanks first, then healers", 20, -234, "sortByRole", Layout)
     H.AddCheck(page, "Unit tooltip on hover", 20, -262, "showTooltip", Visuals)
     H.AddCheck(page, "Enable Smart Cast (Dispel/Ress)", 20, -290, "smartCast", Visuals)
@@ -325,6 +324,41 @@ local function BuildClicks(page)
         slot.clear:SetScript("OnClick", function() S.clicks[curMod .. i] = nil EvsHL.Refresh() Load() end)
         slots[i] = slot
     end
+
+    H.Label(page, "Smart Cast Resurrection Spell", 25, -280)
+    H.Label(page, "Cast automatically when clicking a dead unit.", 25, -296)
+
+    local resBtn = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    resBtn:SetWidth(260)
+    resBtn:SetHeight(24)
+    resBtn:SetPoint("TOPLEFT", 25, -315)
+    local resIcon = resBtn:CreateTexture(nil, "ARTWORK")
+    resIcon:SetWidth(18)
+    resIcon:SetHeight(18)
+    resIcon:SetPoint("LEFT", 5, 0)
+    local resText = resBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    resText:SetPoint("LEFT", resIcon, "RIGHT", 8, 0)
+
+    local function UpdateResBtn()
+        local val = S.resSpell
+        if val and val ~= "" then
+            resIcon:SetTexture(GetSpellTexture(val))
+            resText:SetText(val)
+        else
+            resIcon:SetTexture(nil)
+            resText:SetText("Click to pick a resurrection spell...")
+        end
+    end
+    UpdateResBtn()
+
+    resBtn:SetScript("OnClick", function()
+        H.OpenPicker(false, "Pick Resurrection Spell", function(e)
+            S.resSpell = e.name
+            UpdateResBtn()
+        end)
+    end)
+    widgets[#widgets + 1] = UpdateResBtn
+
     widgets[#widgets + 1] = Load
 end
 

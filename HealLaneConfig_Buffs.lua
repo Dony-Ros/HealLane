@@ -64,7 +64,8 @@ function EvsHL.BuildBuffsTab(page)
     EvsHL.AddConfigWidget(List)
 
     -- Visuals
-    H.Label(page, "Visuals", 260, -85)
+    H.Label(page, "Visuals", 260, -55)
+    H.AddCheck(page, "Monitor missing buffs", 260, -85, "monitorMissingBuffs", EvsHL.ApplyVisuals)
     H.AddCheck(page, "Highlight missing buffs", 260, -115, "buffBorder", EvsHL.ApplyVisuals)
     H.AddColor(page, "Missing Buff Color", 260, -155, "buffsMissingColor", EvsHL.ApplyVisuals)
     H.AddCheck(page, "Check missing buffs on units in combat", 260, -195, "checkBuffsInCombat", EvsHL.ApplyVisuals)
