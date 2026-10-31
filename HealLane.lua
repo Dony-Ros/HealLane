@@ -30,8 +30,8 @@ local DEFAULTS = {
     barAlphaFull = 0.3,
     btnAlpha = 0.35,
     barColor = { 0.2, 0.9, 0.2 },
-    healthThreshold = 95,
     thresholdColor = { 0.1, 1, 0.1 },
+    rangeFadeDistance = 60,
     showIncoming = false,
     incomingColor = { 0.3, 1, 0.5 },
     hotLookahead = 3,
@@ -264,7 +264,7 @@ local function SmartCast_PreClick(self, button, down)
 
                     -- Check if unit has a debuff matching the spell's enabled types
                     local foundMatch = false
-                    for i = 1, 40 do
+                    for i = 1, MAX_UNITS do
                         local name, _, _, _, debuffType = UnitDebuff(unit, i)
                         if not name then break end
                         if debuffType and entry.types[debuffType] then
@@ -287,7 +287,7 @@ local function SmartCast_PreClick(self, button, down)
         if S.monitorMissingBuffs and S.trackBuffs and next(S.trackBuffs)
             and (S.checkBuffsInCombat or not unitInCombat) then
             local buffs = {}
-            for i = 1, 40 do
+            for i = 1, MAX_UNITS do
                 local name = UnitBuff(unit, i)
                 if not name then break end
                 buffs[name] = true
@@ -573,7 +573,7 @@ local function RealData(btn)
     btn.debuffIconTexture = nil
 
     if (S.debuffBorder or S.debuffIcon) and S.dispel and S.dispel.spells then
-        for i = 1, 40 do
+        for i = 1, MAX_UNITS do
             local name, _, icon, _, debuffType = UnitDebuff(unit, i)
             if not name then break end
             if debuffType then
@@ -712,16 +712,17 @@ local function UpdateHealth(btn)
     end
     bar:SetValue(validHealth and health or 0)
 
-    local color = S.barColor
     local fullHealth = validHealth and health >= maxHealth
-    if validHealth and not fullHealth then
-        if btn.hasAggro then
-            color = { 0.1, 1, 0.1 }
-        elseif health / maxHealth < (S.healthThreshold or 95) / 100 then
-            color = S.thresholdColor or { 0.1, 1, 0.1 }
-        end
+    local bright = validHealth and (btn.hasAggro or not fullHealth or btn.debuffColor ~= nil)
+    local color
+    if btn.debuffColor then
+        color = btn.debuffColor
+    elseif bright then
+        color = S.thresholdColor or { 0.1, 1, 0.1 }
+    else
+        color = S.barColor
     end
-    local alpha = validHealth and (fullHealth and S.barAlphaFull or S.barAlpha) or 0
+    local alpha = validHealth and (bright and S.barAlpha or S.barAlphaFull) or 0
     bar:SetStatusBarColor(color[1], color[2], color[3])
     bar.fill:SetAlpha(alpha)
     bar:Show()
@@ -792,7 +793,7 @@ end
 
 local function UpdateDebuff(btn)
     local foundType, foundIcon = nil, nil
-    for i = 1, 40 do
+    for i = 1, MAX_UNITS do
         local name, _, icon, _, debuffType = UnitDebuff(btn.unit, i)
         if not name then break end
         if debuffType then
@@ -812,21 +813,20 @@ local function UpdateDebuff(btn)
         end
     end
 
+    btn.debuffColor = nil
     if foundType then
         local color = S[DEBUFF_COLOR_KEYS[foundType]]
         local fallback = DEBUFF_TYPE_COLORS[foundType] or { r = 1, g = 0, b = 0 }
-        btn.healthBar.bg:SetVertexColor(color and color[1] or fallback.r, color and color[2] or fallback.g,
-            color and color[3] or fallback.b, 1)
-    else
-        btn.healthBar.bg:SetVertexColor(0.08, 0.08, 0.08, S.btnAlpha)
+        btn.debuffColor = {
+            color and color[1] or fallback.r,
+            color and color[2] or fallback.g,
+            color and color[3] or fallback.b,
+        }
     end
 
     if btn.debuffBorder then
         if S.debuffBorder and foundType then
-            local color = S[DEBUFF_COLOR_KEYS[foundType]]
-            local fallback = DEBUFF_TYPE_COLORS[foundType] or { r = 1, g = 1, b = 1 }
-            btn.debuffBorder:SetBackdropBorderColor(color and color[1] or fallback.r, color and color[2] or fallback.g,
-                color and color[3] or fallback.b, 1)
+            btn.debuffBorder:SetBackdropBorderColor(btn.debuffColor[1], btn.debuffColor[2], btn.debuffColor[3], 1)
             btn.debuffBorder:Show()
         else
             btn.debuffBorder:Hide()
@@ -930,35 +930,26 @@ local function UpdateButton(btn)
     local now = GetTime()
     if btn.sim then SimData(btn) else RealData(btn) end
     btn.hasAggro = not btn.sim and (ThreatLevel(btn.unit) or 0) >= 3
-    local inRange = true
     local rangeAlpha = 1
     if not btn.sim and not UnitIsUnit(btn.unit, "player") then
         if UnitDistanceSquared then
             local distanceSquared = UnitDistanceSquared(btn.unit)
-            if distanceSquared and distanceSquared >= 10000 then
+            local fadeDistance = S.rangeFadeDistance or 60
+            if distanceSquared and distanceSquared >= (fadeDistance * 2.5) ^ 2 then
                 rangeAlpha = 0.3
-            elseif distanceSquared and distanceSquared >= 1600 then
+            elseif distanceSquared and distanceSquared >= fadeDistance ^ 2 then
                 rangeAlpha = 0.5
             end
         end
-        if rangeAlpha == 1 and UnitInRange then
-            local unitInRange, checked = UnitInRange(btn.unit)
-            if checked == true or checked == 1 then
-                if unitInRange ~= true and unitInRange ~= 1 then rangeAlpha = 0.5 end
-            elseif CheckInteractDistance then
-                local close = CheckInteractDistance(btn.unit, 4)
-                if close == false then rangeAlpha = 0.5 end
-            end
-        elseif rangeAlpha == 1 and CheckInteractDistance then
-            local close = CheckInteractDistance(btn.unit, 4)
-            if close == false then rangeAlpha = 0.5 end
-        end
+    end
+    if not btn.sim and UnitInVehicle and UnitInVehicle(btn.unit) then
+        rangeAlpha = math.min(rangeAlpha, 0.7)
     end
     btn:SetAlpha(rangeAlpha)
+    UpdateDebuff(btn)
     UpdateHealth(btn)
     UpdateIncoming(btn, now)
     UpdateHoTs(btn, now)
-    UpdateDebuff(btn)
     UpdateBuff(btn)
     if btn.hasAggro then
         btn.aggro:SetBackdropBorderColor(1, 0, 0, 1)
@@ -1276,6 +1267,10 @@ function EvsHL.Refresh()
                 btn.unit = "player"
                 btn:SetAttribute("unit", "player")
                 ApplyClicks(btn, true)
+                if btn.tempTargetDriver then
+                    UnregisterStateDriver(btn, "visibility")
+                    btn.tempTargetDriver = nil
+                end
                 if btn.watched then
                     UnregisterUnitWatch(btn)
                     btn.watched = false
@@ -1287,12 +1282,14 @@ function EvsHL.Refresh()
                 btn.unit = "target"
                 btn:SetAttribute("unit", "target")
                 ApplyClicks(btn)
+                if not btn.tempTargetDriver then
+                    RegisterStateDriver(btn, "visibility", "[@target,help] show; hide")
+                    btn.tempTargetDriver = true
+                end
                 if btn.watched then
                     UnregisterUnitWatch(btn)
                     btn.watched = false
                 end
-                RegisterUnitWatch(btn)
-                btn.watched = true
                 btn:Show()
                 UpdateName(btn)
             else
@@ -1305,6 +1302,10 @@ function EvsHL.Refresh()
 
                 btn:SetAttribute("unit", unit)
                 ApplyClicks(btn)
+                if btn.tempTargetDriver then
+                    UnregisterStateDriver(btn, "visibility")
+                    btn.tempTargetDriver = nil
+                end
                 if not btn.watched then
                     RegisterUnitWatch(btn)
                     btn.watched = true
@@ -1325,6 +1326,10 @@ function EvsHL.Refresh()
             btn.shownName = nil
         else
             btn.sim = nil
+            if btn.tempTargetDriver then
+                UnregisterStateDriver(btn, "visibility")
+                btn.tempTargetDriver = nil
+            end
             if btn.watched then
                 UnregisterUnitWatch(btn)
                 btn.watched = false
@@ -1551,7 +1556,6 @@ end
 frame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
     if event == "ADDON_LOADED" then
         if arg1 == "HealLane" then Init() end
-        
     elseif event == "PLAYER_REGEN_ENABLED" then
         if pending then EvsHL.Refresh() end
     elseif event == "UNIT_SPELLCAST_SENT" then

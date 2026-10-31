@@ -130,7 +130,9 @@ function EvsHL.BuildCureTab(page)
     end
     H.Label(page, "Debuff type colors", 25, -340)
     for i, tName in ipairs(types) do
-        H.AddColor(page, tName, 25, -365 - (i - 1) * 28, typeColorKeys[tName], function()
+        local column = (i - 1) % 2
+        local row = math.floor((i - 1) / 2)
+        H.AddColor(page, tName, 25 + column * 235, -365 - row * 28, typeColorKeys[tName], function()
             EvsHL.ApplyVisuals()
             UpdateTypeGlows()
         end)

@@ -21,4 +21,5 @@ function EvsHL.BuildAppGeneral(page)
         EvsHL.ApplyVisuals()
         EvsHL.Refresh()
     end)
+    H.AddSlider(page, "Range fade starts (yd)", 25, -200, "rangeFadeDistance", 10, 120, 5, EvsHL.ApplyVisuals)
 end
