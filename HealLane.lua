@@ -264,7 +264,7 @@ local function SmartCast_PreClick(self, button, down)
 
                     -- Check if unit has a debuff matching the spell's enabled types
                     local foundMatch = false
-                    for i = 1, MAX_UNITS do
+                    for i = 1, #buttons do
                         local name, _, _, _, debuffType = UnitDebuff(unit, i)
                         if not name then break end
                         if debuffType and entry.types[debuffType] then
@@ -287,7 +287,7 @@ local function SmartCast_PreClick(self, button, down)
         if S.monitorMissingBuffs and S.trackBuffs and next(S.trackBuffs)
             and (S.checkBuffsInCombat or not unitInCombat) then
             local buffs = {}
-            for i = 1, MAX_UNITS do
+            for i = 1, #buttons do
                 local name = UnitBuff(unit, i)
                 if not name then break end
                 buffs[name] = true
@@ -530,8 +530,7 @@ local function Fmt(n)
 end
 
 local SIM_NAMES = { "Awezon", "Aldrin", "Mirelle", "Torvald", "Selene", "Brokk", "Isolde", "Garrick", "Nyx", "Orin" }
-local SIM_CLASSES = { "DRUID", "PRIEST", "PALADIN", "SHAMAN", "WARRIOR", "MAGE", "ROGUE", "HUNTER", "WARLOCK",
-    "DEATHKNIGHT" }
+local SIM_CLASSES = { "DRUID", "PRIEST", "PALADIN", "SHAMAN", "WARRIOR", "MAGE", "ROGUE", "HUNTER", "WARLOCK","DEATHKNIGHT" }
 local SIM_MAX = { 1016, 850, 3400, 12400, 24000, 6200, 15800 }
 local SIM_ICONS = { "Interface\\Icons\\Spell_Nature_Rejuvenation", "Interface\\Icons\\Spell_Holy_Renew",
     "Interface\\Icons\\Spell_Nature_ResistNature" }
@@ -573,7 +572,7 @@ local function RealData(btn)
     btn.debuffIconTexture = nil
 
     if (S.debuffBorder or S.debuffIcon) and S.dispel and S.dispel.spells then
-        for i = 1, MAX_UNITS do
+        for i = 1, #buttons do
             local name, _, icon, _, debuffType = UnitDebuff(unit, i)
             if not name then break end
             if debuffType then
@@ -595,7 +594,7 @@ local function RealData(btn)
     if S.monitorMissingBuffs and S.trackBuffs and next(S.trackBuffs)
         and (S.checkBuffsInCombat or not unitInCombat) then
         local buffs = {}
-        for i = 1, MAX_UNITS do
+        for i = 1, #buttons do
             local name = UnitBuff(unit, i)
             if not name then break end
             buffs[name] = true
@@ -609,7 +608,7 @@ local function RealData(btn)
     end
     btn.nh = 0
     if S.showHots or S.showIncoming then
-        for i = 1, MAX_UNITS do
+        for i = 1, #buttons do
             local name, _, icon, _, _, duration, expires, caster = UnitBuff(unit, i)
             if not name then break end
             if caster == "player" and S.hots[name] and btn.nh < MAX_HOTS then
@@ -793,7 +792,7 @@ end
 
 local function UpdateDebuff(btn)
     local foundType, foundIcon = nil, nil
-    for i = 1, MAX_UNITS do
+    for i = 1, #buttons do
         local name, _, icon, _, debuffType = UnitDebuff(btn.unit, i)
         if not name then break end
         if debuffType then
@@ -914,7 +913,7 @@ local function UpdateUnitRaidIcon(btn)
     end
 end
 local function QueueUpdateUnitRaidIcons()
-    for i = 1, MAX_UNITS do
+    for i = 1, #buttons do
         local btn = buttons[i]
         if btn and btn:IsShown() and btn.unit then UpdateUnitRaidIcon(btn) end
     end
@@ -1202,7 +1201,7 @@ function EvsHL.Refresh()
     if sim > 0 then
         for i = 1, sim do list[i] = "sim" end
     elseif raid then
-        for i = 1, math.min(NumRaid(), MAX_UNITS) do
+        for i = 1, math.min(NumRaid(), #buttons) do
             local unit = "raid" .. i
             if S.showPlayer or not UnitIsUnit(unit, "player") then list[#list + 1] = unit end
         end
@@ -1390,7 +1389,7 @@ local function OnUpdate(_, elapsed)
     acc = acc + elapsed
     if acc < (activeCount > 5 and 0.2 or 0.1) then return end
     acc = 0
-    for i = 1, MAX_UNITS do
+    for i = 1, #buttons do
         local btn = buttons[i]
         if btn and btn:IsShown() and btn.unit then UpdateButton(btn) end
     end
