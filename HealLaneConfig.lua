@@ -5,21 +5,22 @@ local widgets, pages, tabs = {}, {}, {}
 local seq = 0
 local curMod = ""
 local FLAT = "Interface\\Buttons\\WHITE8x8"
-
+local function CreateBackdropFrame(frameType, name, parent, template)
+    if BackdropTemplateMixin then
+        template = template and template ~= "" and (template .. ", BackdropTemplate") or "BackdropTemplate"
+    end
+    return CreateFrame(frameType, name, parent, template)
+end
 function EvsHL.AddConfigWidget(fn) table.insert(widgets, fn) end
-
 local function Name() seq = seq + 1 return "EvsHLCfg" .. seq end
 local function Layout() EvsHL.Refresh() end
 local function Visuals() EvsHL.ApplyVisuals() end
-
 local function Sync()
     for _, fn in ipairs(widgets) do fn() end
 end
-
 function EvsHL.SyncConfig()
     if frame and frame:IsShown() then Sync() end
 end
-
 local function AddCheck(parent, text, x, y, key, after)
     local name = Name()
     local cb = CreateFrame("CheckButton", name, parent, "UICheckButtonTemplate")
@@ -28,7 +29,6 @@ local function AddCheck(parent, text, x, y, key, after)
     cb:SetScript("OnClick", function(self) S[key] = self:GetChecked() and true or false after() end)
     widgets[#widgets + 1] = function() cb:SetChecked(S[key]) end
 end
-
 local function AddSlider(parent, text, x, y, key, lo, hi, step, after)
     local name = Name()
     local s = CreateFrame("Slider", name, parent, "OptionsSliderTemplate")
@@ -52,11 +52,9 @@ local function AddSlider(parent, text, x, y, key, lo, hi, step, after)
         s.loading = false
     end
 end
-
 local function AddButton(parent, text, x, y, w, onClick, anchorPoint, relativePoint, offsetX, offsetY)
     local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     b:SetWidth(w) b:SetHeight(24) b:SetText(text) b:SetScript("OnClick", onClick)
-    
     if anchorPoint then
         b:SetPoint(anchorPoint, offsetX or 0, offsetY or 0)
     else
@@ -64,29 +62,49 @@ local function AddButton(parent, text, x, y, w, onClick, anchorPoint, relativePo
     end
     return b
 end
-
 local function AddColor(parent, text, x, y, key, after)
     local sw = CreateFrame("Button", nil, parent)
     sw:SetWidth(24) sw:SetHeight(24) sw:SetPoint("TOPLEFT", x, y)
     local border = sw:CreateTexture(nil, "BACKGROUND")
-    border:SetPoint("TOPLEFT", -2, 2) border:SetPoint("BOTTOMRIGHT", 2, -2) border:SetTexture(0.6, 0.6, 0.6)
+    border:SetPoint("TOPLEFT", -2, 2) border:SetPoint("BOTTOMRIGHT", 2, -2) EvsHL.SetTextureColor(border, 0.6, 0.6, 0.6)
     local tex = sw:CreateTexture(nil, "ARTWORK")
-    tex:SetAllPoints() tex:SetTexture(1, 1, 1)
+    tex:SetAllPoints() EvsHL.SetTextureColor(tex, 1, 1, 1)
     local label = sw:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     label:SetPoint("LEFT", sw, "RIGHT", 10, 0) label:SetText(text)
     local function paint() tex:SetVertexColor(S[key][1], S[key][2], S[key][3]) end
     sw:SetScript("OnClick", function()
         local c = S[key]
-        ColorPickerFrame.hasOpacity = false
-        ColorPickerFrame.previousValues = { r = c[1], g = c[2], b = c[3] }
-        ColorPickerFrame.func = function() c[1], c[2], c[3] = ColorPickerFrame:GetColorRGB() paint() after() end
-        ColorPickerFrame.cancelFunc = function(prev) c[1], c[2], c[3] = prev.r, prev.g, prev.b paint() after() end
-        ColorPickerFrame:SetColorRGB(c[1], c[2], c[3])
-        ColorPickerFrame:Hide() ColorPickerFrame:Show()
+        local function Save()
+            c[1], c[2], c[3] = ColorPickerFrame:GetColorRGB()
+            paint()
+            after()
+        end
+        local function Restore(previous)
+            c[1], c[2], c[3] = previous.r, previous.g, previous.b
+            paint()
+            after()
+        end
+        if ColorPickerFrame.SetupColorPickerAndShow then
+            ColorPickerFrame:SetupColorPickerAndShow({
+                r = c[1],
+                g = c[2],
+                b = c[3],
+                hasOpacity = false,
+                swatchFunc = Save,
+                cancelFunc = Restore,
+            })
+        else
+            ColorPickerFrame.hasOpacity = false
+            ColorPickerFrame.previousValues = { r = c[1], g = c[2], b = c[3] }
+            ColorPickerFrame.func = Save
+            ColorPickerFrame.cancelFunc = Restore
+            ColorPickerFrame:SetColorRGB(c[1], c[2], c[3])
+            ColorPickerFrame:Hide()
+            ColorPickerFrame:Show()
+        end
     end)
     widgets[#widgets + 1] = paint
 end
-
 local function AddDropdown(parent, x, y, width, options, get, set)
     local name = Name()
     local dd = CreateFrame("Frame", name, parent, "UIDropDownMenuTemplate")
@@ -106,7 +124,6 @@ local function AddDropdown(parent, x, y, width, options, get, set)
     widgets[#widgets + 1] = Show
     return dd
 end
-
 local function Trim(s) return (s or ""):gsub("^%s+", ""):gsub("%s+$", "") end
 local function Macros()
     local list = {}
@@ -121,7 +138,6 @@ local function Macros()
     table.sort(list, function(a, b) return a.name < b.name end)
     return list
 end
-
 local ACTIONS = {
     { name = "Target", action = "target", icon = "Interface\\Icons\\Ability_Marksmanship" },
     { name = "Menu", action = "menu", icon = "Interface\\Icons\\INV_Misc_Note_01" },
@@ -129,7 +145,6 @@ local ACTIONS = {
     { name = "Assist", action = "assist", icon = "Interface\\Icons\\Ability_Hunter_SniperShot" },
 }
 local TAGS = { macro = " |cff9999ff(macro)|r", action = " |cff99ff99(action)|r" }
-
 local function Describe(value)
     if not value or value == "" then return nil end
     local macro = value:match("^m:(.+)")
@@ -142,12 +157,11 @@ local function Describe(value)
         for _, a in ipairs(ACTIONS) do if a.action == action then return a.icon, a.name, "action" end end
         return nil, action, "action"
     end
-    return GetSpellTexture(value), value
+    return EvsHL.GetSpellTexture(value), value
 end
-
 local ROWS, ROW_H = 16, 24 -- Increased visible rows for bigger window
 local function BuildPicker()
-    picker = CreateFrame("Frame", "EvsHLPicker", UIParent)
+    picker = CreateBackdropFrame("Frame", "EvsHLPicker", UIParent)
     picker:SetWidth(320) picker:SetHeight(480) -- Slightly bigger picker
     picker:SetFrameStrata("FULLSCREEN_DIALOG")
     picker:EnableMouse(true) picker:EnableMouseWheel(true) picker:SetClampedToScreen(true)
@@ -169,6 +183,7 @@ local function BuildPicker()
     local allName = Name()
     local all = CreateFrame("CheckButton", allName, picker, "UICheckButtonTemplate")
     all:SetPoint("TOPLEFT", 18, -62) _G[allName .. "Text"]:SetText("Show all spells")
+    picker.allCheckbox = all
     local scrollName = Name()
     local scroll = CreateFrame("ScrollFrame", scrollName, picker, "FauxScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 14, -92) scroll:SetPoint("BOTTOMRIGHT", -34, 14)
@@ -209,8 +224,13 @@ local function BuildPicker()
             local entry = self.entry
             if entry and entry.kind == "spell" and entry.index then
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:SetSpell(entry.index, "spell")
-                GameTooltip:Show()
+                if entry.spellID and GameTooltip.SetSpellByID then
+                    GameTooltip:SetSpellByID(entry.spellID)
+                    GameTooltip:Show()
+                elseif GameTooltip.SetSpell then
+                    GameTooltip:SetSpell(entry.index, "spell")
+                    GameTooltip:Show()
+                end
             end
         end)
         row:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -222,8 +242,7 @@ local function BuildPicker()
     end
     picker.search = search
 end
-
-local function OpenPicker(withMacros, title, callback)
+local function OpenPicker(withMacros, title, callback, showAllSpells)
     if not picker then BuildPicker() end
     EvsHL.ScanSpells()
     local entries = {}
@@ -236,16 +255,15 @@ local function OpenPicker(withMacros, title, callback)
     picker.callback = callback
     picker.title:SetText(title)
     picker.search:SetText("")
+    picker.allCheckbox:SetChecked(showAllSpells and true or false)
     picker:ClearAllPoints()
     picker:SetPoint("TOPLEFT", frame, "TOPRIGHT", -4, 0)
     picker:Show()
     picker.Refilter()
     picker.search:SetFocus()
 end
-
 -- Expose to the other config files
 EvsHL.ConfigHelpers = { AddCheck = AddCheck, AddSlider = AddSlider, AddButton = AddButton, AddColor = AddColor, AddDropdown = AddDropdown, OpenPicker = OpenPicker, Label = function(page, text, x, y) local fs = page:CreateFontString(nil, "OVERLAY", "GameFontNormal") fs:SetPoint("TOPLEFT", x, y) fs:SetText(text) end }
-
 -- GENERAL TAB
 local function BuildGeneral(page)
     local H = EvsHL.ConfigHelpers
@@ -261,23 +279,19 @@ local function BuildGeneral(page)
     H.AddCheck(page, "Enable Smart Cast (Dispel/Ress)", 20, -290, "smartCast", Visuals)
     --H.AddCheck(page, "Show temporary target frame", 20, -318, "showTempTarget", EvsHL.ApplyVisuals)
     H.AddCheck(page, "Show temporary target frame", 20, -318, "showTempTarget", Layout)
-    
+    H.AddCheck(page, "Show pets", 20, -346, "showPets", Layout)
     H.AddColor(page, "Hover outline", 260, -262, "hoverColor", Visuals)
-
     H.Label(page, "Health text", 260, -80)
     H.AddDropdown(page, 244, -98, 120, {
         { "none", "None" }, { "max", "Max health" }, { "missing", "Missing health" }, { "current", "Current health" }, { "percent", "Percent" },
     }, function() return S.hpMode end, function(v) S.hpMode = v Visuals() end)
-
     H.Label(page, "Simulation", 260, -146)
     H.AddDropdown(page, 244, -164, 120, {
         { 0, "Off" }, { 5, "Party (5)" }, { 10, "Raid (10)" }, { 25, "Raid (25)" }, { 40, "Raid (40)" },
     }, function() return EvsHL.simCount or 0 end, function(v) EvsHL.SetSimulation(v) end)
-
     H.AddButton(page, "Reset position", 0, 0, 140, function() EvsHL.ResetPosition() end, "BOTTOMLEFT", nil, 15, 15)
     H.AddButton(page, "Reset all settings", 0, 0, 160, function() EvsHL.ResetAll() Sync() end, "BOTTOMRIGHT", nil, -15, 15)
 end
-
 local function BuildClicks(page)
     local H = EvsHL.ConfigHelpers
     local modOptions = {
@@ -287,7 +301,6 @@ local function BuildClicks(page)
     }
     local btnLabels = { "Left", "Right", "Middle", "Button 4", "Button 5" }
     local slots = {}
-
     local function Load()
         for i, slot in ipairs(slots) do
             local value = S.clicks[curMod .. i]
@@ -297,52 +310,126 @@ local function BuildClicks(page)
             else
                 slot.icon:SetTexture(nil) slot.text:SetText(i == 1 and "Target (default)" or i == 2 and "Menu (default)" or "Click to choose...") slot.text:SetTextColor(0.55, 0.55, 0.55) slot.clear:Hide()
             end
+            if text and not tag then
+                slot.rankDropdown:Show()
+                slot.rankText()
+            else
+                slot.rankDropdown:Hide()
+            end
         end
     end
-
     H.Label(page, "Modifier", 25, -16)
     H.AddDropdown(page, 85, -8, 150, modOptions, function() return curMod end, function(v) curMod = v Load() end)
-
     for i, text in ipairs(btnLabels) do
+        local index = i
         local y = -52 - (i - 1) * 42
         H.Label(page, text, 25, y - 7)
-        local slot = CreateFrame("Button", nil, page)
-        slot:SetWidth(260) slot:SetHeight(28) slot:SetPoint("TOPLEFT", 110, y)
+        local slot = CreateBackdropFrame("Button", nil, page)
+        slot:SetWidth(150) slot:SetHeight(28) slot:SetPoint("TOPLEFT", 110, y)
         slot:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
         slot:SetBackdropColor(0, 0, 0, 0.6)
         slot:SetHighlightTexture(FLAT) slot:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.12)
         slot.icon = slot:CreateTexture(nil, "ARTWORK") slot.icon:SetWidth(20) slot.icon:SetHeight(20) slot.icon:SetPoint("LEFT", 5, 0)
         slot.text = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlight") slot.text:SetPoint("LEFT", slot.icon, "RIGHT", 8, 0) slot.text:SetPoint("RIGHT", -6, 0) slot.text:SetJustifyH("LEFT")
+        slot.rankDropdown = CreateFrame("Frame", Name(), page, "UIDropDownMenuTemplate")
+        slot.rankDropdown:SetPoint("LEFT", slot, "RIGHT", -8, 0)
+        if not pcall(UIDropDownMenu_SetWidth, 100, slot.rankDropdown) then
+            pcall(UIDropDownMenu_SetWidth, slot.rankDropdown, 100)
+        end
+        local function RankOptions()
+            local options = { { value = "__max", text = "Max rank" } }
+            local slotKey = curMod .. index
+            local chosen = S.clicks[slotKey]
+            local _, _, tag = Describe(chosen)
+            if chosen and not tag then
+                for _, entry in ipairs(EvsHL.spells or {}) do
+                    if entry.name == chosen then
+                        for _, rank in ipairs(entry.ranks or {}) do
+                            options[#options + 1] = { value = rank, text = rank }
+                        end
+                        break
+                    end
+                end
+                local selectedRank = S.clickRanks and S.clickRanks[slotKey]
+                local found = false
+                for _, option in ipairs(options) do
+                    if option.value == selectedRank then found = true break end
+                end
+                if selectedRank and not found then
+                    options[#options + 1] = { value = selectedRank, text = selectedRank }
+                end
+            end
+            return options
+        end
+        UIDropDownMenu_Initialize(slot.rankDropdown, function()
+            local slotKey = curMod .. index
+            for _, option in ipairs(RankOptions()) do
+                local value, label = option.value, option.text
+                UIDropDownMenu_AddButton({
+                    text = label,
+                    checked = (S.clickRanks and S.clickRanks[slotKey] or "__max") == value,
+                    func = function()
+                        S.clickRanks = S.clickRanks or {}
+                        if value == "__max" then
+                            S.clickRanks[slotKey] = nil
+                        else
+                            S.clickRanks[slotKey] = value
+                        end
+                        Load()
+                        EvsHL.Refresh()
+                    end,
+                })
+            end
+        end)
         slot:SetScript("OnClick", function()
             H.OpenPicker(true, btnLabels[i] .. " click", function(e)
-                S.clicks[curMod .. i] = e.kind == "macro" and ("m:" .. e.name) or e.kind == "action" and ("a:" .. e.action) or e.name
+                local slotKey = curMod .. index
+                S.clicks[slotKey] = e.kind == "macro" and ("m:" .. e.name) or e.kind == "action" and ("a:" .. e.action) or e.name
+                S.clickRanks = S.clickRanks or {}
+                S.clickRanks[slotKey] = nil
                 EvsHL.Refresh() Load()
             end)
         end)
         slot.clear = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-        slot.clear:SetWidth(24) slot.clear:SetHeight(24) slot.clear:SetPoint("LEFT", slot, "RIGHT", 6, 0) slot.clear:SetText("X")
-        slot.clear:SetScript("OnClick", function() S.clicks[curMod .. i] = nil EvsHL.Refresh() Load() end)
+        slot.clear:SetWidth(24) slot.clear:SetHeight(24) slot.clear:SetPoint("LEFT", slot.rankDropdown, "RIGHT", -8, 0) slot.clear:SetText("X")
+        slot.clear:SetScript("OnClick", function()
+            local slotKey = curMod .. index
+            S.clicks[slotKey] = nil
+            if S.clickRanks then S.clickRanks[slotKey] = nil end
+            EvsHL.Refresh()
+            Load()
+        end)
+        slot.rankDropdown:Hide()
+        slot.rankText = function()
+            local slotKey = curMod .. index
+            local rank = S.clickRanks and S.clickRanks[slotKey]
+            local selectedText = "Max rank"
+            for _, option in ipairs(RankOptions()) do
+                if option.value == rank then selectedText = option.text break end
+            end
+            UIDropDownMenu_SetText(slot.rankDropdown, selectedText)
+        end
         slots[i] = slot
     end
-
-    H.Label(page, "Smart Cast Resurrection Spell", 25, -280)
-    H.Label(page, "Cast automatically when clicking a dead unit.", 25, -296)
-
+    AddCheck(page, "Auto-downgrade ranks for low-level units", 25, -252, "autoDownrank", Layout)
+    H.Label(page, "Uses the built-in rank table; unlisted spells keep their selected rank.", 25, -280)
+    H.Label(page, "Ranked click bindings update out of combat.", 25, -296)
+    H.Label(page, "Smart Cast Resurrection Spell", 25, -324)
+    H.Label(page, "Cast automatically when clicking a dead unit.", 25, -340)
     local resBtn = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
     resBtn:SetWidth(260)
     resBtn:SetHeight(24)
-    resBtn:SetPoint("TOPLEFT", 25, -315)
+    resBtn:SetPoint("TOPLEFT", 25, -359)
     local resIcon = resBtn:CreateTexture(nil, "ARTWORK")
     resIcon:SetWidth(18)
     resIcon:SetHeight(18)
     resIcon:SetPoint("LEFT", 5, 0)
     local resText = resBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     resText:SetPoint("LEFT", resIcon, "RIGHT", 8, 0)
-
     local function UpdateResBtn()
         local val = S.resSpell
         if val and val ~= "" then
-            resIcon:SetTexture(GetSpellTexture(val))
+            resIcon:SetTexture(EvsHL.GetSpellTexture(val))
             resText:SetText(val)
         else
             resIcon:SetTexture(nil)
@@ -350,7 +437,6 @@ local function BuildClicks(page)
         end
     end
     UpdateResBtn()
-
     resBtn:SetScript("OnClick", function()
         H.OpenPicker(false, "Pick Resurrection Spell", function(e)
             S.resSpell = e.name
@@ -358,10 +444,8 @@ local function BuildClicks(page)
         end)
     end)
     widgets[#widgets + 1] = UpdateResBtn
-
     widgets[#widgets + 1] = Load
 end
-
 local function BuildHots(page)
     local H = EvsHL.ConfigHelpers
     local MAXROWS = 16
@@ -373,7 +457,9 @@ local function BuildHots(page)
             if count >= MAXROWS and not S.hots[e.name] then
                 DEFAULT_CHAT_FRAME:AddMessage("HealLane: HoT list is full (" .. MAXROWS .. ")") return
             end
-            S.hots[e.name] = true List()
+            S.hots[e.name] = true
+            List()
+            EvsHL.ApplyVisuals()
         end)
     end)
     local spellInput = CreateFrame("EditBox", Name(), page, "InputBoxTemplate")
@@ -386,7 +472,7 @@ local function BuildHots(page)
     local function AddSpell(value)
         local query = Trim(value)
         if query == "" then return end
-        local spellName = GetSpellInfo(tonumber(query) or query)
+        local spellName = EvsHL.GetSpellInfo(tonumber(query) or query)
         if not spellName or spellName == "" then
             DEFAULT_CHAT_FRAME:AddMessage("HealLane: Spell not found. Enter a valid spell name or ID.")
             return
@@ -401,6 +487,7 @@ local function BuildHots(page)
         spellInput:SetText("")
         spellInput:ClearFocus()
         List()
+        EvsHL.ApplyVisuals()
     end
     spellInput:SetScript("OnEnterPressed", function(self) AddSpell(self:GetText()) end)
     H.AddButton(page, "Add name/ID", 315, -8, 105, function() AddSpell(spellInput:GetText()) end)
@@ -411,7 +498,11 @@ local function BuildHots(page)
         row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight") row.text:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
         row.remove = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
         row.remove:SetWidth(22) row.remove:SetHeight(20) row.remove:SetPoint("RIGHT", -5, 0) row.remove:SetText("X")
-        row.remove:SetScript("OnClick", function() S.hots[row.spell] = nil List() end)
+        row.remove:SetScript("OnClick", function()
+            S.hots[row.spell] = nil
+            List()
+            EvsHL.ApplyVisuals()
+        end)
         rows[i] = row
     end
     List = function()
@@ -420,13 +511,12 @@ local function BuildHots(page)
         table.sort(names)
         for i, row in ipairs(rows) do
             local n = names[i]
-            if n then row.spell = n row.text:SetText(n) row.icon:SetTexture(GetSpellTexture(n)) row:Show()
+            if n then row.spell = n row.text:SetText(n) row.icon:SetTexture(EvsHL.GetSpellTexture(n)) row:Show()
             else row:Hide() end
         end
     end
     widgets[#widgets + 1] = List
 end
-
 -- Replace the Select() function
 local subPages, subTabs = {}, {}
 local function SelectSub(index)
@@ -434,7 +524,6 @@ local function SelectSub(index)
         if i == index then p:Show() subTabs[i]:Disable() else p:Hide() subTabs[i]:Enable() end
     end
 end
-
 local function BuildAppearanceParent(page)
     local subBuilders = { 
         EvsHL.BuildAppGeneral, 
@@ -444,7 +533,6 @@ local function BuildAppearanceParent(page)
         EvsHL.BuildAppIncoming 
     }
     local subLabels = { "General", "Healing", "Bars", "Icons", "inc.Heals" }
-    
     for i, build in ipairs(subBuilders) do
         local tab = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
         tab:SetWidth(74) tab:SetHeight(22)
@@ -452,7 +540,6 @@ local function BuildAppearanceParent(page)
         tab:SetText(subLabels[i])
         tab:SetScript("OnClick", function() SelectSub(i) end)
         subTabs[i] = tab
-        
         local subPage = CreateFrame("Frame", nil, page)
         subPage:SetPoint("TOPLEFT", 0, -30)
         subPage:SetPoint("BOTTOMRIGHT", 0, 0)
@@ -462,16 +549,14 @@ local function BuildAppearanceParent(page)
     end
     SelectSub(1)
 end
-
 local function Select(index)
     for i, p in ipairs(pages) do
         if i == index then p:Show() tabs[i]:Disable() else p:Hide() tabs[i]:Enable() end
     end
 end
-
 local function Build()
-    frame = CreateFrame("Frame", "EvsHLConfigFrame", UIParent)
-    frame:SetWidth(500) frame:SetHeight(700)
+    frame = CreateBackdropFrame("Frame", "EvsHLConfigFrame", UIParent)
+    frame:SetWidth(500) frame:SetHeight(730)
     frame:SetPoint("CENTER") frame:SetFrameStrata("DIALOG")
     frame:SetMovable(true) frame:EnableMouse(true) frame:SetClampedToScreen(true)
     frame:RegisterForDrag("LeftButton")
@@ -487,39 +572,37 @@ local function Build()
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -6, -6)
     tinsert(UISpecialFrames, "EvsHLConfigFrame")
-
     -- Main Tabs
-    local builders = { BuildGeneral, BuildAppearanceParent, BuildClicks, BuildHots, EvsHL.BuildCureTab, EvsHL.BuildBuffsTab }
-    local labels = { "General", "Appearance", "Clicks", "HoTs", "Cure", "Buffs" }
+    local builders = { BuildGeneral, BuildAppearanceParent, BuildClicks, BuildHots, EvsHL.BuildCureTab, EvsHL.BuildDebuffsTab, EvsHL.BuildBuffsTab, EvsHL.BuildModsTab }
+    local labels = { "General", "Appearance", "Clicks", "HoTs", "Cure", "Debuffs", "Buffs", "Mods" }
+    local TABS_PER_ROW = 7
     for i, build in ipairs(builders) do
         local tab = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-        tab:SetWidth(74) tab:SetHeight(24)
-        tab:SetPoint("TOPLEFT", 22 + (i - 1) * 76, -44)
+        tab:SetWidth(64) tab:SetHeight(24)
+        local tabRow = math.floor((i - 1) / TABS_PER_ROW)
+        local tabCol = (i - 1) % TABS_PER_ROW
+        tab:SetPoint("TOPLEFT", 22 + tabCol * 66, -44 - tabRow * 26)
         tab:SetText(labels[i])
         tab:SetScript("OnClick", function() Select(i) end)
         tabs[i] = tab
         local page = CreateFrame("Frame", nil, frame)
-        page:SetPoint("TOPLEFT", 10, -76) page:SetPoint("BOTTOMRIGHT", -10, 12) page:Hide()
+        page:SetPoint("TOPLEFT", 10, -102) page:SetPoint("BOTTOMRIGHT", -10, 12) page:Hide()
         pages[i] = page
         build(page)
     end
-
     frame:SetScript("OnShow", Sync)
     frame:SetScript("OnHide", function() if picker then picker:Hide() end end)
     Select(1)
 end
-
 function EvsHL.ToggleConfig()
     S = EvsHL.S
     if not S then return end
     if not frame then Build() end
     if frame:IsShown() then frame:Hide() else frame:Show() end
 end
-
 SLASH_HEALLANE1 = "/heallane"
 SLASH_HEALLANE2 = "/hl"
 SlashCmdList["HEALLANE"] = function() EvsHL.ToggleConfig() end
-
 -- NEW: Slash command to reset settings
 SLASH_HEALLANE_RESET1 = "/hlreset"
 SlashCmdList["HEALLANE_RESET"] = function()
@@ -529,10 +612,14 @@ SlashCmdList["HEALLANE_RESET"] = function()
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00HealLane:|r Settings have been reset to default.")
     end
 end
-
 local panel = CreateFrame("Frame", "EvsHLOptionsPanel", UIParent)
 panel.name = "HealLane"
 local open = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 open:SetWidth(160) open:SetHeight(24) open:SetPoint("TOPLEFT", 20, -20) open:SetText("Open settings")
 open:SetScript("OnClick", function() EvsHL.ToggleConfig() end)
-InterfaceOptions_AddCategory(panel)
+if Settings and Settings.RegisterCanvasLayoutCategory then
+    local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
+    Settings.RegisterAddOnCategory(category)
+elseif InterfaceOptions_AddCategory then
+    InterfaceOptions_AddCategory(panel)
+end

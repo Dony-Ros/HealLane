@@ -1,5 +1,4 @@
 local EvsHL = EvsHL
-
 function EvsHL.BuildAppBars(page)
     local S = EvsHL.S
     local H = EvsHL.ConfigHelpers -- MOVED INSIDE

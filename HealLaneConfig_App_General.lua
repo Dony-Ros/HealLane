@@ -1,5 +1,4 @@
 local EvsHL = EvsHL
-
 function EvsHL.BuildAppGeneral(page)
     local S = EvsHL.S
     local H = EvsHL.ConfigHelpers -- MOVED INSIDE
@@ -11,7 +10,6 @@ function EvsHL.BuildAppGeneral(page)
         S.frameAnchor = v
         EvsHL.Refresh()
     end)
-
     H.Label(page, "Health Bar Direction", 25, -120)
     H.AddDropdown(page, 25, -140, 120, {
         { "LEFT", "Left to Right" },

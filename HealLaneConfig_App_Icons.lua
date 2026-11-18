@@ -1,5 +1,4 @@
 local EvsHL = EvsHL
-
 function EvsHL.BuildAppIcons(page)
     local S = EvsHL.S
     local H = EvsHL.ConfigHelpers -- MOVED INSIDE
@@ -8,14 +7,21 @@ function EvsHL.BuildAppIcons(page)
     H.AddCheck(page, "Show raid target icon", 260, -75, "showRaidIcon", EvsHL.Refresh)
     H.AddSlider(page, "Role icon scale", 25, -120, "roleIconScale", 0.5, 3, 0.1, EvsHL.ApplyVisuals)
     H.AddSlider(page, "Raid icon scale", 260, -120, "raidIconScale", 0.5, 3, 0.1, EvsHL.ApplyVisuals)
-    
     H.Label(page, "HoT position", 25, -180)
     H.AddDropdown(page, 25, -200, 120, {
         { "TOPLEFT", "Top left" }, { "TOP", "Top" }, { "TOPRIGHT", "Top right" },
         { "LEFT", "Left" }, { "CENTER", "Center" }, { "RIGHT", "Right" },
         { "BOTTOMLEFT", "Bottom left" }, { "BOTTOM", "Bottom" }, { "BOTTOMRIGHT", "Bottom right" },
     }, function() return S.hotAnchor end, function(v) S.hotAnchor = v EvsHL.ApplyVisuals() end)
-
+    H.Label(page, "Debuff icon position", 260, -180)
+    H.AddDropdown(page, 260, -200, 120, {
+        { "TOPLEFT", "Top left" }, { "TOP", "Top" }, { "TOPRIGHT", "Top right" },
+        { "LEFT", "Center left" }, { "CENTER", "Center" }, { "RIGHT", "Center right" },
+        { "BOTTOMLEFT", "Bottom left" }, { "BOTTOM", "Bottom" }, { "BOTTOMRIGHT", "Bottom right" },
+    }, function() return S.debuffIconAnchor or "BOTTOMLEFT" end, function(v)
+        S.debuffIconAnchor = v
+        EvsHL.ApplyVisuals()
+    end)
     H.Label(page, "Role icon anchor", 25, -255)
     H.AddDropdown(page, 25, -275, 120, {
         { "TOPLEFT", "Top left" }, { "TOP", "Top center" }, { "TOPRIGHT", "Top right" },
@@ -25,7 +31,6 @@ function EvsHL.BuildAppIcons(page)
         S.roleIconAnchor = v
         EvsHL.ApplyVisuals()
     end)
-
     H.Label(page, "Raid target icon anchor", 25, -325)
     H.AddDropdown(page, 25, -345, 120, {
         { "TOPLEFT", "Top left" }, { "TOP", "Top center" }, { "TOPRIGHT", "Top right" },

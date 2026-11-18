@@ -1,16 +1,27 @@
 local EvsHL = EvsHL
 local S
 local H = EvsHL.ConfigHelpers
-
 function EvsHL.BuildBuffsTab(page)
     S = EvsHL.S
-    local MAXROWS = 20
+    local MAXROWS = 16
     local rows = {}
     local List
-    
+
+    local function TargetOf(name)
+        local t = name and S.trackBuffs[name]
+        if not t or t == true then return "any" end
+        return t
+    end
+
+    local function TargetLabel(value)
+        for _, o in ipairs(EvsHL.BUFF_TARGETS) do
+            if o[1] == value then return o[2] end
+        end
+        return EvsHL.BUFF_TARGETS[1][2]
+    end
+
     H.Label(page, "Tracked Buffs (Smart Cast)", 25, -20)
-    H.Label(page, "If missing, the frame highlights and Smart Cast clicks will cast the buff.", 25, -36)
-    
+    H.Label(page, "Pick who each buff is tracked on. Pets are always ignored.", 25, -36)
     H.AddButton(page, "Add Buff...", 25, -55, 140, function()
         H.OpenPicker(false, "Add Tracked Buff", function(e)
             local count = 0
@@ -19,23 +30,30 @@ function EvsHL.BuildBuffsTab(page)
                 DEFAULT_CHAT_FRAME:AddMessage("HealLane: Buff tracking list is full (" .. MAXROWS .. ")")
                 return
             end
-            S.trackBuffs[e.name] = true
+            S.trackBuffs[e.name] = TargetOf(e.name)
             List()
         end)
     end)
 
+    H.Label(page, "Recast buffs expiring within:", 25, -100)
+    H.AddDropdown(page, 25, -120, 120, EvsHL.BUFF_EXPIRE_OPTIONS,
+        function() return S.buffExpireWarn or 0 end,
+        function(v) S.buffExpireWarn = v end)
+
     for i = 1, MAXROWS do
         local row = CreateFrame("Frame", nil, page)
-        row:SetWidth(200)
-        row:SetHeight(20)
-        row:SetPoint("TOPLEFT", 25, -85 - (i - 1) * 22)
-        
+        row:SetWidth(440)
+        row:SetHeight(24)
+        row:SetPoint("TOPLEFT", 25, -235 - (i - 1) * 22)
         row.icon = row:CreateTexture(nil, "ARTWORK")
         row.icon:SetWidth(18) row.icon:SetHeight(18) row.icon:SetPoint("LEFT", 0, 0)
-        
         row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         row.text:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
-        
+        row.text:SetWidth(150)
+        row.text:SetJustifyH("LEFT")
+        row.dd = H.AddDropdown(row, 165, 2, 100, EvsHL.BUFF_TARGETS,
+            function() return TargetOf(row.spell) end,
+            function(v) if row.spell then S.trackBuffs[row.spell] = v end end)
         row.remove = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
         row.remove:SetWidth(22) row.remove:SetHeight(20) row.remove:SetPoint("RIGHT", -5, 0) row.remove:SetText("X")
         row.remove:SetScript("OnClick", function()
@@ -54,9 +72,12 @@ function EvsHL.BuildBuffsTab(page)
             if n then
                 row.spell = n
                 row.text:SetText(n)
-                row.icon:SetTexture(GetSpellTexture(n))
+                row.icon:SetTexture(EvsHL.GetSpellTexture(n))
+                local ddText = _G[row.dd:GetName() .. "Text"]
+                if ddText then ddText:SetText(TargetLabel(TargetOf(n))) end
                 row:Show()
             else
+                row.spell = nil
                 row:Hide()
             end
         end

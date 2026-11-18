@@ -1,20 +1,36 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
-
+  <!-- Shared constants must load first. -->
+  <Script file="HealLane_Constants.lua" />
+  <!-- Core: EvsHL namespace, helpers, saved vars, event frame. -->
   <Script file="HealLane.lua" />
-  
+  <!-- Feature modules (order matters only for the module-level hooks they export). -->
+  <Script file="HealLane_Roles.lua" />
+  <Script file="HealLane_Sorting.lua" />
+  <Script file="HealLane_Spells.lua" />
+  <Script file="HealLane_Auras.lua" />
+  <Script file="HealLane_SmartCast.lua" />
+  <Script file="HealLane_Data.lua" />
+  <Script file="HealLane_UpdateVisuals.lua" />
+  <Script file="HealLane_Refresh.lua" />
+  <Script file="HealLane_Units.lua" />
+  <Script file="HealLane_FiveSecond.lua" />
+  <Script file="HealLane_ChatRoles.lua" />
+  <Script file="HealLane_NameAlert.lua" />
+  <Script file="HealLane_LootRolls.lua" />
+  <Script file="HealLane_AutoEnchant.lua" />
+  <!-- Config UI (unchanged). -->
   <Script file="HealLaneConfig_App_General.lua" />
   <Script file="HealLaneConfig_App_Healing.lua" />
   <Script file="HealLaneConfig_App_Bars.lua" />
   <Script file="HealLaneConfig_App_Icons.lua" />
   <Script file="HealLaneConfig_App_Incoming.lua" />
-  
   <Script file="HealLaneConfig.lua" />
   <Script file="HealLaneConfig_Cure.lua" />
+  <Script file="HealLaneConfig_Debuffs.lua" />
   <Script file="HealLaneConfig_Buffs.lua" />
-
-
+  <Script file="HealLaneConfig_Mods.lua" />
 <StatusBar name="HealLaneHealthBarTemplate" virtual="true">
     <Size><AbsDimension x="125" y="50"/></Size>
     <Layers>
@@ -30,7 +46,6 @@
     <BarTexture file="Interface\Buttons\WHITE8x8"/>
     <BarColor r="0.2" g="0.9" b="0.2"/>
   </StatusBar>
-
   <Button name="HealLaneUnitButtonTemplate" virtual="true" inherits="SecureUnitButtonTemplate, SecureActionButtonTemplate">
     <Size><AbsDimension x="125" y="50"/></Size>
     <Frames>
@@ -61,6 +76,4 @@
       </OnLoad>
     </Scripts>
   </Button>
-
-
 </Ui>
