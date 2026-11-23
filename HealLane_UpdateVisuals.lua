@@ -33,7 +33,8 @@ end
 
 function EvsHL.UpdateHoTs(btn, now)
     local S = EvsHL.S
-    if btn.nativeAurasActive and not btn.sim then
+    if not btn.sim and (btn.nativeAurasActive
+        or (EvsHL.nativeAuraSupported and not EvsHL.CanScanAuras())) then
         for i = 1, EvsHL.MAX_HOTS do
             btn.hotIcons[i]:Hide()
             btn.hotTexts[i]:Hide()
@@ -198,7 +199,7 @@ local function EnsureHealthColorCurve()
     end
 
     local curve = C_CurveUtil.CreateColorCurve()
-    curve:SetType(Enum.LuaCurveType.Linear)
+    curve:SetType(Enum.LuaCurveType.Step)
     curve:AddPoint(0, CreateColor(bright[1], bright[2], bright[3], brightAlpha))
     curve:AddPoint(0.995, CreateColor(bright[1], bright[2], bright[3], brightAlpha))
     curve:AddPoint(1, CreateColor(dark[1], dark[2], dark[3], darkAlpha))
@@ -221,10 +222,13 @@ local function HasThreat(btn, unit)
         return false
     end
     local ok, status = pcall(UnitThreatSituation, unit)
-    if not ok or status == nil then
-        return false
+    if not ok then
+        return nil
     end
-    if issecretvalue and issecretvalue(status) then
+    if EvsHL.IsSecretValue(status) then
+        return nil
+    end
+    if status == nil then
         return false
     end
     return status > 0
@@ -326,9 +330,27 @@ function EvsHL.UpdateHealth(btn)
         bar.fill:SetAlpha(S.barAlpha)
     else
         local base
-        if HasThreat(btn, unit) then
+        local nearbyCondition
+        local hasNearbyCondition = false
+        local fullHealth = not EvsHL.IsSecretValue(health) and not EvsHL.IsSecretValue(maxLife)
+            and type(health) == "number" and type(maxLife) == "number"
+            and maxLife > 0 and health >= maxLife
+        local hasThreat = HasThreat(btn, unit)
+        if hasThreat then
             local c = S.thresholdColor or EvsHL.DEFAULTS.thresholdColor
             base = CreateColor(c[1], c[2], c[3], S.barAlpha)
+        elseif fullHealth then
+            local c = S.barColor or EvsHL.DEFAULTS.barColor
+            base = CreateColor(c[1], c[2], c[3], S.barAlphaFull)
+            if hasThreat == false then
+                if UnitIsUnit(unit, "player") then
+                    nearbyCondition = true
+                    hasNearbyCondition = true
+                elseif btn.hasNearbyRange then
+                    nearbyCondition = btn.nearbyRange
+                    hasNearbyCondition = true
+                end
+            end
         else
             local curve = EnsureHealthColorCurve()
             if curve and UnitHealthPercent then
@@ -344,6 +366,20 @@ function EvsHL.UpdateHealth(btn)
         local r, g, b, a = base:GetRGBA()
         bar:SetStatusBarColor(r, g, b)
         bar.fill:SetAlpha(a)
+        if hasNearbyCondition then
+            local nearbyColor = S.nearbyColor or EvsHL.DEFAULTS.nearbyColor
+            local safe = CreateColor(nearbyColor[1], nearbyColor[2], nearbyColor[3], 1)
+            local normal = CreateColor(r, g, b, 1)
+            if bar.fill.SetVertexColorFromBoolean then
+                bar.fill:SetVertexColorFromBoolean(nearbyCondition, safe, normal)
+                if bar.fill.SetAlphaFromBoolean then
+                    bar.fill:SetAlphaFromBoolean(nearbyCondition, S.barAlpha, a)
+                end
+            elseif not EvsHL.IsSecretValue(nearbyCondition) and nearbyCondition then
+                bar:SetStatusBarColor(nearbyColor[1], nearbyColor[2], nearbyColor[3])
+                bar.fill:SetAlpha(S.barAlpha)
+            end
+        end
     end
 
     bar:Show()
@@ -353,6 +389,61 @@ function EvsHL.UpdateHealth(btn)
     -- ==========================================
     EvsHL.ApplyHealthText(btn)
 end
+
+local function ResourceColor(powerType, powerToken)
+    local powerTypes = Enum and Enum.PowerType
+    if powerType == (powerTypes and powerTypes.Mana or 0) then
+        return 0, 0, 1
+    elseif powerType == (powerTypes and powerTypes.Rage or 1) then
+        return 1, 0, 0
+    elseif powerType == (powerTypes and powerTypes.Energy or 3) then
+        return 1, 1, 0
+    end
+
+    local color = type(powerToken) == "string" and PowerBarColor and PowerBarColor[powerToken]
+    if not color and PowerBarColor then
+        color = PowerBarColor[powerType]
+    end
+    if color then
+        return color.r or color[1] or 0.5, color.g or color[2] or 0.5, color.b or color[3] or 1
+    end
+    return 0.5, 0.5, 1
+end
+
+function EvsHL.UpdateResourceBar(btn)
+    local bar = btn.resourceBar
+    local S = EvsHL.S
+    if not bar then return end
+    if not S or not S.showResourceBar or btn.sim or not btn.unit
+        or not UnitPowerType or not UnitPower or not UnitPowerMax then
+        bar:Hide()
+        return
+    end
+
+    local ok, powerType, powerToken = pcall(UnitPowerType, btn.unit)
+    if not ok or EvsHL.IsSecretValue(powerType) or type(powerType) ~= "number" then
+        bar:Hide()
+        return
+    end
+
+    local maximum = UnitPowerMax(btn.unit, powerType)
+    local power = UnitPower(btn.unit, powerType)
+    if not EvsHL.IsSecretValue(maximum) and (type(maximum) ~= "number" or maximum <= 0) then
+        bar:Hide()
+        return
+    end
+    if not EvsHL.IsSecretValue(power) and type(power) ~= "number" then
+        bar:Hide()
+        return
+    end
+
+    local r, g, b = ResourceColor(powerType, powerToken)
+    bar:SetStatusBarColor(r, g, b)
+    bar:SetMinMaxValues(0, maximum)
+    bar:SetValue(power)
+    bar:Show()
+end
+
 -- ============================================================
 -- Rest of the visual updates (Incoming, Name, Debuff, Buff)
 -- ============================================================
@@ -379,109 +470,135 @@ function EvsHL.LayoutHealPrediction(btn)
     pred:SetStatusBarColor(c[1], c[2], c[3], 0.8)
 end
 
-function EvsHL.UpdateHealPrediction(btn)
-    local S = EvsHL.S
-    local pred = btn.healPred
-    if not pred then
-        return
-    end
-    if not S.showHealPrediction or btn.dead or btn.online == false then
-        pred:Hide()
-        return
-    end
-
-    if btn.sim then
-        local maxHealth = btn.max or 1
-        pred:SetMinMaxValues(0, maxHealth)
-        pred:SetValue(math.min(btn.cast or 0, maxHealth - (btn.health or 0)))
-        pred:Show()
-        return
-    end
-
-    if not (CreateUnitHealPredictionCalculator and UnitGetDetailedHealPrediction) then
-        pred:Hide()
-        return
-    end
-    local calc = EvsHL.healPredCalc
-    if not calc then
-        calc = CreateUnitHealPredictionCalculator()
-        EvsHL.healPredCalc = calc
-    end
-    local unit = btn.unit
-    local ok, total, _, _, clamped = pcall(function()
-        UnitGetDetailedHealPrediction(unit, "player", calc)
-        return calc:GetIncomingHeals()
-    end)
-    local value = clamped
-    if type(value) ~= "number" then
-        value = total
-    end
-    if not ok or type(value) ~= "number" then
-        pred:Hide()
-        return
-    end
+local function SetHealPredictionValue(pred, unit, value, color)
+    pred:SetStatusBarColor(color[1], color[2], color[3], 0.8)
     pred:SetMinMaxValues(0, UnitHealthMax(unit))
     pred:SetValue(value)
     pred:Show()
 end
 
-function EvsHL.UpdateIncoming(btn, now)
-    local S = EvsHL.S
+local function TrackedHealEstimate(btn, now, S)
+    local total = 0
     if not S.showIncoming then
-        btn.incoming = nil
-        btn.incomingSpell = nil
-        btn.incomingEnd = nil
-        btn.incomingBar:Hide()
-        return
+        return total
     end
-    if not btn.healthBar:IsShown() or (issecretvalue and issecretvalue(btn.health)) or
-        (issecretvalue and issecretvalue(btn.max)) or btn.max <= 0 then
-        btn.incomingBar:Hide()
-        return
+    local cast = btn.cast
+    if not EvsHL.IsSecretValue(cast) and type(cast) == "number" and cast > 0 then
+        total = cast
     end
-    local total = btn.cast
-    for k = 1, btn.nh do
-        local h = btn.hots[k]
-        if h.rate > 0 and h.expires > 0 then
-            local rem = h.expires - now
-            if rem > 0 then
-                total = total + h.rate * math.min(rem, S.hotLookahead)
+
+    local lookahead = type(S.hotLookahead) == "number" and S.hotLookahead or 3
+    local trackedNames = {}
+    for name, hot in pairs(btn.trackedHots or {}) do
+        local expires = hot.expires
+        if not EvsHL.IsSecretValue(expires) and type(expires) == "number" and expires <= now then
+            btn.trackedHots[name] = nil
+        else
+            local rate = hot.rate
+            if not EvsHL.IsSecretValue(rate) and type(rate) == "number" and rate > 0
+                and not EvsHL.IsSecretValue(expires) and type(expires) == "number" then
+                local remaining = expires - now
+                if remaining > 0 then
+                    total = total + rate * math.min(remaining, lookahead)
+                    trackedNames[name] = true
+                end
             end
         end
     end
-    local w = math.min(total, btn.max - btn.health) / btn.max * btn:GetWidth()
-    if w < 0.5 then
-        btn.incomingBar:Hide()
+    for i = 1, (btn.nh or 0) do
+        local hot = btn.hots[i]
+        if hot and not (hot.name and trackedNames[hot.name])
+            and not EvsHL.IsSecretValue(hot.rate) and type(hot.rate) == "number"
+            and hot.rate > 0 and not EvsHL.IsSecretValue(hot.expires)
+            and type(hot.expires) == "number" then
+            local remaining = hot.expires - now
+            if remaining > 0 then
+                total = total + hot.rate * math.min(remaining, lookahead)
+            end
+        end
+    end
+    return total
+end
+
+function EvsHL.UpdateHealPrediction(btn, now)
+    local S = EvsHL.S
+    local pred = btn.healPred
+    if not pred then
         return
     end
-    btn.incomingBar:ClearAllPoints()
-    if S.barsAnchor == "RIGHT" then
-        local offset = -btn:GetWidth() * (1 - btn.health / btn.max)
-        btn.incomingBar:SetPoint("TOPRIGHT", btn, "TOPRIGHT", offset, 0)
-        btn.incomingBar:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", offset, 0)
-    else
-        local offset = btn:GetWidth() * btn.health / btn.max
-        btn.incomingBar:SetPoint("TOPLEFT", btn, "TOPLEFT", offset, 0)
-        btn.incomingBar:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", offset, 0)
+    if (not S.showHealPrediction and not S.showIncoming) or btn.dead or btn.online == false then
+        pred:Hide()
+        return
     end
-    btn.incomingBar:SetWidth(w)
-    btn.incomingBar:SetVertexColor(S.incomingColor[1], S.incomingColor[2], S.incomingColor[3], 0.6)
-    btn.incomingBar:Show()
+
+    if btn.sim then
+        local color = S.showIncoming and S.incomingColor or S.healPredictionColor
+        local value = S.showIncoming and TrackedHealEstimate(btn, now or GetTime(), S) or (btn.cast or 0)
+        pred:SetStatusBarColor(color[1], color[2], color[3], 0.8)
+        pred:SetMinMaxValues(0, btn.max or 1)
+        pred:SetValue(value)
+        pred:Show()
+        return
+    end
+
+    local unit = btn.unit
+    if S.showHealPrediction and CreateUnitHealPredictionCalculator and UnitGetDetailedHealPrediction then
+        local calc = EvsHL.healPredCalc
+        if not calc then
+            calc = CreateUnitHealPredictionCalculator()
+            EvsHL.healPredCalc = calc
+        end
+        local ok, total, _, _, clamped = pcall(function()
+            UnitGetDetailedHealPrediction(unit, "player", calc)
+            return calc:GetIncomingHeals()
+        end)
+        if ok then
+            local value
+            if type(clamped) == "number" then
+                value = clamped
+            else
+                value = total
+            end
+            if type(value) == "number" and EvsHL.IsSecretValue(value) then
+                -- StatusBar accepts secret values, but their zero/nonzero state cannot be tested here.
+                SetHealPredictionValue(pred, unit, value, S.healPredictionColor or EvsHL.DEFAULTS.healPredictionColor)
+                return
+            elseif type(value) == "number" and value > 0 then
+                SetHealPredictionValue(pred, unit, value, S.healPredictionColor or EvsHL.DEFAULTS.healPredictionColor)
+                return
+            end
+        end
+    end
+
+    if not S.showIncoming then
+        pred:Hide()
+        return
+    end
+
+    local estimate = TrackedHealEstimate(btn, now or GetTime(), S)
+    if estimate <= 0 then
+        pred:Hide()
+        return
+    end
+    SetHealPredictionValue(pred, unit, estimate, S.incomingColor or EvsHL.DEFAULTS.incomingColor)
 end
 
 function EvsHL.UpdateName(btn)
     local S = EvsHL.S
-    btn.name = UnitName(btn.unit)
-    local _, class = UnitClass(btn.unit)
-    btn.class = class
-
-    if EvsHL.IsSecretValue(btn.name) then
+    local name = UnitName(btn.unit)
+    if EvsHL.IsSecretValue(name) then
+        btn.name = nil
         btn.shownName = nil
-        btn.font:SetText(btn.name)
-    elseif btn.shownName ~= btn.name then
-        btn.shownName = btn.name
-        btn.font:SetText(btn.name)
+        btn.font:SetText("")
+    else
+        btn.name = name
+        if btn.shownName ~= name then
+            btn.shownName = name
+            btn.font:SetText(name or "")
+        end
     end
+    local _, class = UnitClass(btn.unit)
+    btn.class = not EvsHL.IsSecretValue(class) and type(class) == "string" and class or nil
     local r, g, b = 1, 1, 1
     if btn.isPet then
         r, g, b = 0.75, 0.75, 0.75
@@ -498,19 +615,22 @@ local function ScamDebuffs(btn)
     local S = EvsHL.S
     local foundType, foundIcon = btn.debuff, btn.debuffIconTexture
 
-    if not InCombatLockdown() then
+    if EvsHL.CanScanAuras() then
         foundType, foundIcon = nil, nil
         local genericIcon
         for i = 1, #EvsHL.buttons do
             local name, _, icon, _, debuffType, _, _, _, _, _, spellID = EvsHL.GetAura(btn.unit, i, "HARMFUL")
+            if EvsHL.IsSecretValue(name) then break end
             if not name then
                 break
             end
-            if not (spellID and S.ignoredDebuffs and S.ignoredDebuffs[spellID]) then
+            local ignored = type(spellID) == "number" and not EvsHL.IsSecretValue(spellID)
+                and S.ignoredDebuffs and S.ignoredDebuffs[spellID]
+            if not ignored then
                 if not genericIcon then
                     genericIcon = icon
                 end
-                if debuffType then
+                if not EvsHL.IsSecretValue(debuffType) and debuffType then
                     for _, entry in pairs((S.dispel and S.dispel.spells) or {}) do
                         if entry.spell and entry.spell ~= "" and entry.types and entry.types[debuffType] then
                             for _, knownSpell in ipairs(EvsHL.spells or {}) do
@@ -576,9 +696,6 @@ function EvsHL.UpdateDebuff(btn)
     end
 
     if nativeCombatAuras then
-        if not InCombatLockdown() then
-            EvsHL.RecolorDispelTints(btn)
-        end
         btn.debuffIcon:Hide()
     elseif S.debuffIcon and foundIcon then
         btn.debuffIconTex:SetTexture(foundIcon)

@@ -4,6 +4,9 @@ local function SmartCast_PreClick(self, button, down)
     local S = EvsHL.S
     if not S then return end
     local unit = self.unit
+    if S.showIncoming and unit and not self.sim then
+        EvsHL.pendingClickTarget = { unit = unit, time = GetTime() }
+    end
     if not unit or self.sim or InCombatLockdown() then return end
     local isGroupUnit = unit ~= "target" or UnitInParty(unit) or UnitInRaid(unit)
     if S.smartCast then
@@ -22,7 +25,7 @@ local function SmartCast_PreClick(self, button, down)
             end
         end
         -- 2. Dispel (Debuff check)
-        if isGroupUnit and S.dispel and S.dispel.spells then
+        if EvsHL.CanScanAuras() and isGroupUnit and S.dispel and S.dispel.spells then
             for _, entry in pairs(S.dispel.spells) do
                 local spellName = entry.spell
                 if spellName and spellName ~= "" then
@@ -30,8 +33,9 @@ local function SmartCast_PreClick(self, button, down)
                     local foundMatch = false
                     for i = 1, #EvsHL.buttons do
                         local name, _, _, _, debuffType = EvsHL.GetAura(unit, i, "HARMFUL")
+                        if EvsHL.IsSecretValue(name) then break end
                         if not name then break end
-                        if debuffType and entry.types[debuffType] then
+                        if not EvsHL.IsSecretValue(debuffType) and debuffType and entry.types[debuffType] then
                             foundMatch = true
                             break
                         end
@@ -46,20 +50,34 @@ local function SmartCast_PreClick(self, button, down)
         end
         -- 3. Missing Buffs
         local unitInCombat = UnitAffectingCombat and UnitAffectingCombat(unit)
-        if S.monitorMissingBuffs and S.trackBuffs and next(S.trackBuffs) and UnitIsVisible(unit)
-            and (S.checkBuffsInCombat or not unitInCombat) then
+        local canCheckCombat = S.checkBuffsInCombat
+            or (not EvsHL.IsSecretValue(unitInCombat) and not unitInCombat)
+        if EvsHL.CanScanAuras() and S.monitorMissingBuffs and S.trackBuffs and next(S.trackBuffs) and UnitIsVisible(unit)
+            and canCheckCombat then
             local buffs = {}
+            local completeScan = true
             for i = 1, #EvsHL.buttons do
-                local name, _, _, _, _, duration, expires = EvsHL.GetAura(unit, i, "HELPFUL")
+                local name, _, _, _, _, duration, expires, _, _, _, spellID = EvsHL.GetAura(unit, i, "HELPFUL")
+                if EvsHL.IsSecretValue(name) then
+                    completeScan = false
+                    break
+                end
                 if not name then break end
-                buffs[name] = math.max(buffs[name] or 0, EvsHL.BuffRemaining(duration, expires))
+                if not EvsHL.RecordBuffAura(buffs, name, spellID, duration, expires) then
+                    completeScan = false
+                    break
+                end
             end
-            for buffName, target in pairs(S.trackBuffs) do
-                if EvsHL.BuffTargetMatches(self, target) and EvsHL.BuffLacking(buffs, buffName) then
-                    if EvsHL.IsSpellInRange(buffName, unit) then
-                        self:SetAttribute("type1", "macro")
-                        self:SetAttribute("macrotext1", EvsHL.CastMacro(buffName, unit))
-                        return
+            if completeScan then
+                for buffName, target in pairs(S.trackBuffs) do
+                    if EvsHL.BuffTargetMatches(self, target) and EvsHL.BuffLacking(buffs, buffName) then
+                        if EvsHL.IsSpellInRange(buffName, unit) then
+                            local rank = EvsHL.GetSpellRankForUnit(buffName, unit)
+                            local spellName = rank and (buffName .. "(" .. rank .. ")") or buffName
+                            self:SetAttribute("type1", "macro")
+                            self:SetAttribute("macrotext1", EvsHL.CastMacro(spellName, unit))
+                            return
+                        end
                     end
                 end
             end

@@ -76,9 +76,18 @@ EvsHL.DEFAULTS = {
     barAlphaFull = 0.3,
     btnAlpha = 0.35,
     barColor = { 0.2, 0.9, 0.2 },
+    nearbyColor = { 0.106, 0.482, 0.106 },
+    showResourceBar = false,
+    resourceBarWidth = 100,
+    resourceBarHeight = 4,
+    resourceBarAnchor = "BOTTOM",
+    resourceBarOffsetX = 0,
+    resourceBarOffsetY = 2,
     thresholdColor = { 0.1, 1, 0.1 },
     aggroColor = { 1, 0, 0 },
     rangeFadeDistance = 60,
+    farFadeDistance = 200,
+    rangeFallbackAlpha = 0.05,
     showIncoming = false,
     showHealPrediction = true,
     healPredictionColor = { 0.5, 1, 0.7 },
@@ -112,16 +121,12 @@ EvsHL.DEFAULTS = {
     buffIcon = true,
     frameAnchor = "TOPRIGHT",
     barsAnchor = "LEFT",
+    hideBlizzardPartyFrames = false,
+    hideBlizzardRaidFrames = false,
     showTempTarget = true,
     showPets = false,
-    fsrEnabled = false,
     chatRoleIcons = false,
     nameAlert = false,
-    lootRollTooltip = true,
-    autoReplaceEnchant = false,
-    fsrColor = { 0.3, 0.6, 1 },
-    fsrOffset = 3,
-    fsrThickness = 3,
 }
 
 -- WoW: Forever rank learning levels used by the optional target-level rank rule.
@@ -208,6 +213,20 @@ function EvsHL.BuffLacking(buffs, name)
     if not remaining then return true end
     local warn = EvsHL.S and EvsHL.S.buffExpireWarn or 0
     return warn > 0 and remaining <= warn
+end
+
+function EvsHL.RecordBuffAura(buffs, name, spellID, duration, expires)
+    if EvsHL.IsSecretValue(name) or type(name) ~= "string" then return false end
+    local remaining = EvsHL.BuffRemaining(duration, expires)
+    buffs[name] = math.max(buffs[name] or 0, remaining)
+    if type(spellID) == "number" and not EvsHL.IsSecretValue(spellID) then
+        for _, spell in ipairs(EvsHL.spells or {}) do
+            if type(spell.name) == "string" and spell.spellIDs and spell.spellIDs[spellID] then
+                buffs[spell.name] = math.max(buffs[spell.name] or 0, remaining)
+            end
+        end
+    end
+    return true
 end
 
 -- Pets never need tracked buffs. Legacy `true` entries mean "any".

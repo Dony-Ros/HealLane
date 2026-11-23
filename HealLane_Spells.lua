@@ -32,12 +32,14 @@ local function HealAmount(spell)
         end
     end
 end
-local rateCache = {}
-local function HotRate(spell)
-    local now = GetTime()
-    local c = rateCache[spell]
-    if c and now - c.t < 5 then return c.rate end
-    local rate = 0
+local hotInfoCache = {}
+local function HotInfo(spell)
+    if not spell then return 0, 0 end
+    local cached = hotInfoCache[spell]
+    if cached then return cached.rate, cached.duration end
+    if InCombatLockdown and InCombatLockdown() then return 0, 0 end
+
+    local rate, duration = 0, 0
     local entry = FindSpell(spell)
     if entry then
         Tooltip(entry)
@@ -46,16 +48,25 @@ local function HotRate(spell)
             local text = fs and fs:GetText()
             if text then
                 text = text:gsub(",", "")
-                local total, dur = text:match("(%d+)%s+over%s+(%d+%.?%d*)%s+sec")
-                if total then
-                    rate = tonumber(total) / tonumber(dur)
+                local total, seconds = text:match("(%d+)%s+over%s+(%d+%.?%d*)%s+sec")
+                if total and tonumber(seconds) and tonumber(seconds) > 0 then
+                    duration = tonumber(seconds)
+                    rate = tonumber(total) / duration
                     break
                 end
             end
         end
     end
-    rateCache[spell] = { rate = rate, t = now }
+    hotInfoCache[spell] = { rate = rate, duration = duration }
+    return rate, duration
+end
+local function HotRate(spell)
+    local rate = HotInfo(spell)
     return rate
+end
+local function HotDuration(spell)
+    local _, duration = HotInfo(spell)
+    return duration
 end
 local function AddSpellRank(entry, rank)
     if not rank or rank == "" then return end
@@ -70,6 +81,26 @@ local function SpellRankLabel(index)
         return RANK:format(index)
     end
     return "Rank " .. index
+end
+local function SpellBookLearnLevel(slot, bank, spellID)
+    if C_SpellBook and C_SpellBook.GetSpellBookItemLevelLearned then
+        local ok, level = pcall(C_SpellBook.GetSpellBookItemLevelLearned, slot, bank)
+        if ok and not EvsHL.IsSecretValue(level) and type(level) == "number" and level > 0 then
+            return level
+        end
+    end
+    if spellID and C_Spell and C_Spell.GetSpellLevelLearned then
+        local ok, level = pcall(C_Spell.GetSpellLevelLearned, spellID)
+        if ok and not EvsHL.IsSecretValue(level) and type(level) == "number" and level > 0 then
+            return level
+        end
+    end
+    if spellID and GetSpellLevelLearned then
+        local ok, level = pcall(GetSpellLevelLearned, spellID)
+        if ok and not EvsHL.IsSecretValue(level) and type(level) == "number" and level > 0 then
+            return level
+        end
+    end
 end
 local function SpellBookInfo(slot, bank, spellID, name, rank, rankCounts, missingRanks)
     local bookName, bookRank
@@ -88,11 +119,13 @@ local function SpellBookInfo(slot, bank, spellID, name, rank, rankCounts, missin
     end
     local count = (rankCounts[name] or 0) + 1
     rankCounts[name] = count
+    local rankNumber = type(rank) == "string" and tonumber(rank:match("(%d+)")) or count
+    local learnedLevel = SpellBookLearnLevel(slot, bank, spellID)
     if not rank or rank == "" then
         missingRanks[name] = missingRanks[name] or {}
         missingRanks[name][#missingRanks[name] + 1] = count
     end
-    return name, rank
+    return name, rank, rankNumber, learnedLevel
 end
 function EvsHL.LearnHotID(name, spellID)
     local S = EvsHL.S
@@ -116,6 +149,14 @@ end
 EvsHL.FindSpell = FindSpell
 EvsHL.HealAmount = HealAmount
 EvsHL.HotRate = HotRate
+EvsHL.HotDuration = HotDuration
+function EvsHL.PrepareHotPredictions()
+    if InCombatLockdown and InCombatLockdown() then return end
+    local S = EvsHL.S
+    for name, enabled in pairs((S and S.hots) or {}) do
+        if enabled then HotInfo(name) end
+    end
+end
 function EvsHL.ScanSpells()
     local list, seen = {}, {}
     local rankCounts = {}
@@ -135,13 +176,18 @@ function EvsHL.ScanSpells()
                         local name, rank = EvsHL.GetSpellInfo(spellID)
                         local passive = C_Spell and C_Spell.IsSpellPassive and C_Spell.IsSpellPassive(spellID)
                         if name and not passive then
-                            name, rank = SpellBookInfo(slot, bank, spellID, name, rank, rankCounts, missingRanks)
+                            local rankNumber, learnedLevel
+                            name, rank, rankNumber, learnedLevel = SpellBookInfo(slot, bank, spellID, name, rank, rankCounts, missingRanks)
                             local entry = seen[name]
                             if entry then
                                 entry.index = slot
                                 entry.spellID = spellID
                                 entry.spellIDs[spellID] = true
                                 entry.rank = rank
+                                if learnedLevel then
+                                    entry.rankLearnLevels = entry.rankLearnLevels or {}
+                                    entry.rankLearnLevels[rankNumber] = learnedLevel
+                                end
                                 AddSpellRank(entry, rank)
                             else
                                 local helpful = C_Spell and C_Spell.IsSpellHelpful and C_Spell.IsSpellHelpful(spellID)
@@ -155,6 +201,7 @@ function EvsHL.ScanSpells()
                                     spellID = spellID,
                                     spellIDs = { [spellID] = true },
                                     rank = rank,
+                                    rankLearnLevels = learnedLevel and { [rankNumber] = learnedLevel } or {},
                                 }
                                 AddSpellRank(entry, rank)
                                 seen[name] = entry
@@ -173,11 +220,16 @@ function EvsHL.ScanSpells()
                 local name, rank = getBookName(i, "spell")
                 local passive = IsPassiveSpell and IsPassiveSpell(i, "spell")
                 if name and not passive then
-                    name, rank = SpellBookInfo(i, "spell", nil, name, rank, rankCounts, missingRanks)
+                    local rankNumber, learnedLevel
+                    name, rank, rankNumber, learnedLevel = SpellBookInfo(i, "spell", nil, name, rank, rankCounts, missingRanks)
                     local entry = seen[name]
                     if entry then
                         entry.index = i
                         entry.rank = rank
+                        if learnedLevel then
+                            entry.rankLearnLevels = entry.rankLearnLevels or {}
+                            entry.rankLearnLevels[rankNumber] = learnedLevel
+                        end
                         AddSpellRank(entry, rank)
                     else
                         entry = {
@@ -187,6 +239,7 @@ function EvsHL.ScanSpells()
                             kind = "spell",
                             index = i,
                             rank = rank,
+                            rankLearnLevels = learnedLevel and { [rankNumber] = learnedLevel } or {},
                         }
                         AddSpellRank(entry, rank)
                         seen[name] = entry
@@ -208,6 +261,9 @@ function EvsHL.ScanSpells()
     end
     table.sort(list, function(a, b) return a.name < b.name end)
     EvsHL.spells = list
+    if not InCombatLockdown or not InCombatLockdown() then
+        hotInfoCache = {}
+    end
     local S = EvsHL.S
     if S then
         for name in pairs(seen) do
@@ -217,6 +273,7 @@ function EvsHL.ScanSpells()
             end
         end
     end
+    if EvsHL.PrepareHotPredictions then EvsHL.PrepareHotPredictions() end
     if EvsHL.SyncConfig then EvsHL.SyncConfig() end
     EvsHL.ApplyVisuals()
 end
@@ -238,6 +295,56 @@ function EvsHL.SpellNameFromCastEvent(value, spellID)
     end
     return value
 end
+local function FindButtonForTarget(target, targetUnit)
+    if type(targetUnit) == "string" and not EvsHL.IsSecretValue(targetUnit) then
+        for _, btn in pairs(EvsHL.buttons) do
+            if btn.unit and not btn.sim
+                and (btn.unit == targetUnit or (UnitExists(targetUnit) and UnitIsUnit(btn.unit, targetUnit))) then
+                return btn
+            end
+        end
+    end
+    if type(target) ~= "string" or EvsHL.IsSecretValue(target) then return nil end
+    for _, btn in pairs(EvsHL.buttons) do
+        if btn.unit and not btn.sim and UnitExists(target) and UnitIsUnit(btn.unit, target) then
+            return btn
+        end
+    end
+
+    local nameMatches = {}
+    for _, btn in pairs(EvsHL.buttons) do
+        if btn.unit and not btn.sim then
+            local name, realm = UnitName(btn.unit)
+            if not EvsHL.IsSecretValue(name) and not EvsHL.IsSecretValue(realm) then
+                local fullName = name and realm and realm ~= "" and (name .. "-" .. realm) or name
+                if target == fullName then
+                    return btn
+                elseif target == name then
+                    nameMatches[#nameMatches + 1] = btn
+                end
+            end
+        end
+    end
+    if #nameMatches == 1 then return nameMatches[1] end
+end
+function EvsHL.TrackHotCast(target, spell, targetUnit)
+    local S = EvsHL.S
+    if not S or not S.showIncoming or type(spell) ~= "string"
+        or EvsHL.IsSecretValue(spell) or not S.hots or not S.hots[spell] then
+        return
+    end
+    local rate, duration = HotInfo(spell)
+    if rate <= 0 or duration <= 0 then return end
+    local btn = FindButtonForTarget(target, targetUnit)
+    if not btn then return end
+
+    btn.trackedHots = btn.trackedHots or {}
+    btn.trackedHots[spell] = {
+        rate = rate,
+        expires = GetTime() + duration,
+        name = spell,
+    }
+end
 function EvsHL.StartIncoming(spell)
     local S = EvsHL.S
     if not S then return end
@@ -249,37 +356,13 @@ function EvsHL.StartIncoming(spell)
     local _, _, _, _, _, endTime = UnitCastingInfo("player")
     local target = pendingCast.target
     if not target or target == "" then return end
-    local matchedButton
-    for _, btn in pairs(EvsHL.buttons) do
-        if btn.unit and not btn.sim then
-            if UnitExists(target) and UnitIsUnit(btn.unit, target) then
-                matchedButton = btn
-                break
-            end
-        end
-    end
-    if not matchedButton then
-        local nameMatches = {}
-        for _, btn in pairs(EvsHL.buttons) do
-            if btn.unit and not btn.sim then
-                local name, realm = UnitName(btn.unit)
-                local fullName = realm and realm ~= "" and (name .. "-" .. realm) or name
-                if target == fullName then
-                    matchedButton = btn
-                    break
-                elseif target == name then
-                    nameMatches[#nameMatches + 1] = btn
-                end
-            end
-        end
-        if not matchedButton and #nameMatches == 1 then
-            matchedButton = nameMatches[1]
-        end
-    end
+    local matchedButton = FindButtonForTarget(target, pendingCast.targetUnit)
     if matchedButton then
         matchedButton.incoming = amount
         matchedButton.incomingSpell = spell
         matchedButton.incomingEnd = endTime and endTime / 1000
     end
-    EvsHL.pendingCast = nil
+    if not (S.hots and S.hots[spell]) then
+        EvsHL.pendingCast = nil
+    end
 end

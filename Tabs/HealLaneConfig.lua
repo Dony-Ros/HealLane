@@ -262,33 +262,63 @@ local function OpenPicker(withMacros, title, callback, showAllSpells)
     picker.Refilter()
     picker.search:SetFocus()
 end
+local function Label(page, text, x, y)
+    local fs = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("TOPLEFT", x, y) fs:SetText(text)
+    return fs
+end
+local function Note(parent, text, x, y)
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    fs:SetPoint("TOPLEFT", x, y) fs:SetText(text) fs:SetTextColor(0.7, 0.7, 0.7)
+    return fs
+end
+local function Field(parent, text, x, y, width, options, get, set)
+    Label(parent, text, x, y)
+    return AddDropdown(parent, x - 16, y - 18, width, options, get, set)
+end
+local function Section(page, title, y, h, x, w)
+    local c = CreateBackdropFrame("Frame", nil, page)
+    c:SetWidth(w or 460) c:SetHeight(h) c:SetPoint("TOPLEFT", x or 10, y)
+    c:SetBackdrop({ bgFile = FLAT, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+    c:SetBackdropColor(0, 0, 0, 0.35)
+    c:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
+    local fs = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("TOPLEFT", 12, -8) fs:SetText(title)
+    return c
+end
 -- Expose to the other config files
-EvsHL.ConfigHelpers = { AddCheck = AddCheck, AddSlider = AddSlider, AddButton = AddButton, AddColor = AddColor, AddDropdown = AddDropdown, OpenPicker = OpenPicker, Label = function(page, text, x, y) local fs = page:CreateFontString(nil, "OVERLAY", "GameFontNormal") fs:SetPoint("TOPLEFT", x, y) fs:SetText(text) end }
+EvsHL.ConfigHelpers = { Backdrop = CreateBackdropFrame, AddCheck = AddCheck, AddSlider = AddSlider, AddButton = AddButton, AddColor = AddColor, AddDropdown = AddDropdown, OpenPicker = OpenPicker, Label = Label, Note = Note, Field = Field, Section = Section }
 -- GENERAL TAB
 local function BuildGeneral(page)
     local H = EvsHL.ConfigHelpers
-    H.AddCheck(page, "Lock frame", 20, -10, "locked", Layout)
-    H.AddCheck(page, "Show player", 20, -38, "showPlayer", Layout)
-    H.AddCheck(page, "Hide when solo (locked only)", 20, -66, "hideSolo", Layout)
-    H.AddCheck(page, "Show HoT icons", 20, -94, "showHots", Visuals)
-    H.AddCheck(page, "Debuff outline", 20, -122, "debuffBorder", Visuals)
-    H.AddCheck(page, "Class colored names", 20, -150, "classColor", Visuals)
-    H.AddCheck(page, "Container border", 20, -178, "showBorder", Visuals)
-    H.AddCheck(page, "Sort: tanks first, then healers", 20, -234, "sortByRole", Layout)
-    H.AddCheck(page, "Unit tooltip on hover", 20, -262, "showTooltip", Visuals)
-    H.AddCheck(page, "Enable Smart Cast (Dispel/Ress)", 20, -290, "smartCast", Visuals)
-    --H.AddCheck(page, "Show temporary target frame", 20, -318, "showTempTarget", EvsHL.ApplyVisuals)
-    H.AddCheck(page, "Show temporary target frame", 20, -318, "showTempTarget", Layout)
-    H.AddCheck(page, "Show pets", 20, -346, "showPets", Layout)
-    H.AddColor(page, "Hover outline", 260, -262, "hoverColor", Visuals)
-    H.Label(page, "Health text", 260, -80)
-    H.AddDropdown(page, 244, -98, 120, {
+    local L, R = 8, 235
+
+    local frameBox = Section(page, "Frame", -4, 116)
+    H.AddCheck(frameBox, "Lock frame", L, -26, "locked", Layout)
+    H.AddCheck(frameBox, "Show player", L, -54, "showPlayer", Layout)
+    H.AddCheck(frameBox, "Hide when solo (locked only)", L, -82, "hideSolo", Layout)
+    H.AddCheck(frameBox, "Show pets", R, -54, "showPets", Layout)
+    H.AddCheck(frameBox, "Show temporary target frame", R, -82, "showTempTarget", Layout)
+
+    local displayBox = Section(page, "Display", -128, 126)
+    H.AddCheck(displayBox, "Debuff outline", L, -26, "debuffBorder", Visuals)
+    H.AddCheck(displayBox, "Class colored names", L, -54, "classColor", Visuals)
+    H.AddCheck(displayBox, "Unit tooltip on hover", R, -26, "showTooltip", Visuals)
+    H.AddColor(displayBox, "Hover outline", R + 8, -58, "hoverColor", Visuals)
+    H.Label(displayBox, "Health text", 14, -96)
+    H.AddDropdown(displayBox, 95, -88, 120, {
         { "none", "None" }, { "max", "Max health" }, { "missing", "Missing health" }, { "current", "Current health" }, { "percent", "Percent" },
     }, function() return S.hpMode end, function(v) S.hpMode = v Visuals() end)
-    H.Label(page, "Simulation", 260, -146)
-    H.AddDropdown(page, 244, -164, 120, {
+
+    local behaviorBox = Section(page, "Behavior", -262, 150)
+    H.AddCheck(behaviorBox, "Enable Smart Cast (Dispel/Ress)", L, -26, "smartCast", Visuals)
+    H.AddCheck(behaviorBox, "Hide Blizzard party frames", L, -54, "hideBlizzardPartyFrames", EvsHL.SetBlizzardPartyFramesHidden)
+    H.AddCheck(behaviorBox, "Hide Blizzard raid frames", L, -82, "hideBlizzardRaidFrames", EvsHL.SetBlizzardRaidFramesHidden)
+    H.Label(behaviorBox, "Simulation", 14, -120)
+    H.AddDropdown(behaviorBox, 95, -112, 120, {
         { 0, "Off" }, { 5, "Party (5)" }, { 10, "Raid (10)" }, { 25, "Raid (25)" }, { 40, "Raid (40)" },
     }, function() return EvsHL.simCount or 0 end, function(v) EvsHL.SetSimulation(v) end)
+
     H.AddButton(page, "Reset position", 0, 0, 140, function() EvsHL.ResetPosition() end, "BOTTOMLEFT", nil, 15, 15)
     H.AddButton(page, "Reset all settings", 0, 0, 160, function() EvsHL.ResetAll() Sync() end, "BOTTOMRIGHT", nil, -15, 15)
 end
@@ -412,8 +442,8 @@ local function BuildClicks(page)
         slots[i] = slot
     end
     AddCheck(page, "Auto-downgrade ranks for low-level units", 25, -252, "autoDownrank", Layout)
-    H.Label(page, "Uses the built-in rank table; unlisted spells keep their selected rank.", 25, -280)
-    H.Label(page, "Ranked click bindings update out of combat.", 25, -296)
+    H.Label(page, "Uses spellbook levels or built-in rank levels.", 25, -280)
+    H.Label(page, "Also applies to tracked buffs cast by Smart Cast.", 25, -296)
     H.Label(page, "Smart Cast Resurrection Spell", 25, -324)
     H.Label(page, "Cast automatically when clicking a dead unit.", 25, -340)
     local resBtn = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
@@ -530,9 +560,9 @@ local function BuildAppearanceParent(page)
         EvsHL.BuildAppHealing, 
         EvsHL.BuildAppBars, 
         EvsHL.BuildAppIcons, 
-        EvsHL.BuildAppIncoming 
+        EvsHL.BuildAppSorting,
     }
-    local subLabels = { "General", "Healing", "Bars", "Icons", "inc.Heals" }
+    local subLabels = { "General", "Healing", "Bars", "Icons", "Sorting" }
     for i, build in ipairs(subBuilders) do
         local tab = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
         tab:SetWidth(74) tab:SetHeight(22)
@@ -556,7 +586,7 @@ local function Select(index)
 end
 local function Build()
     frame = CreateBackdropFrame("Frame", "EvsHLConfigFrame", UIParent)
-    frame:SetWidth(500) frame:SetHeight(730)
+    frame:SetWidth(500) frame:SetHeight(660)
     frame:SetPoint("CENTER") frame:SetFrameStrata("DIALOG")
     frame:SetMovable(true) frame:EnableMouse(true) frame:SetClampedToScreen(true)
     frame:RegisterForDrag("LeftButton")

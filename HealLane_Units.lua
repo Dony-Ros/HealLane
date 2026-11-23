@@ -89,6 +89,18 @@ local function PositionMarker(icon, anchor)
     icon:ClearAllPoints()
     icon:SetPoint(anchor, icon:GetParent(), anchor, x, y)
 end
+local function LayoutResourceBar(btn, S)
+    local bar = btn.resourceBar
+    if not bar then
+        return
+    end
+    local anchor = S.resourceBarAnchor or "BOTTOM"
+    local width = (btn:GetWidth() - 4) * (S.resourceBarWidth or 100) / 100
+    bar:ClearAllPoints()
+    bar:SetWidth(math.max(1, width))
+    bar:SetHeight(S.resourceBarHeight or 4)
+    bar:SetPoint(anchor, btn, anchor, S.resourceBarOffsetX or 0, S.resourceBarOffsetY or 2)
+end
 function EvsHL.ApplyVisuals()
     local S = EvsHL.S
     if not S then
@@ -96,6 +108,9 @@ function EvsHL.ApplyVisuals()
     end
     if InCombatLockdown() then
         return
+    end
+    if EvsHL.PrepareHotPredictions then
+        EvsHL.PrepareHotPredictions()
     end
     EvsHL.RefreshNativeAuraFrames()
     EvsHL.healthAlphaCurve = nil
@@ -152,10 +167,10 @@ function EvsHL.ApplyVisuals()
             btn.incoming = nil
             btn.incomingSpell = nil
             btn.incomingEnd = nil
-            btn.incomingBar:Hide()
         end
         btn.healthBar.bg:SetVertexColor(0.08, 0.08, 0.08, S.btnAlpha)
         EvsHL.LayoutHealPrediction(btn)
+        LayoutResourceBar(btn, S)
         btn.roleIcon:SetWidth(20 * (S.roleIconScale or 1))
         btn.roleIcon:SetHeight(20 * (S.roleIconScale or 1))
         btn.raidTargetIcon:SetWidth(16 * (S.raidIconScale or 1))
@@ -244,24 +259,17 @@ function EvsHL.CreateUnitButton(index)
     btn:HookScript("PostClick", EvsHL.SmartCast_PostClick)
     local predClip = CreateFrame("Frame", nil, btn)
     predClip:SetAllPoints(btn.healthBar)
-    predClip:SetFrameLevel(btn:GetFrameLevel())
+    predClip:SetFrameLevel(btn.healthBar:GetFrameLevel() + 1)
     predClip:SetClipsChildren(true)
     predClip:EnableMouse(false)
     local pred = CreateFrame("StatusBar", nil, predClip)
-    pred:SetFrameLevel(btn:GetFrameLevel())
+    pred:SetFrameLevel(predClip:GetFrameLevel() + 1)
     pred:SetStatusBarTexture(EvsHL.FLAT)
     pred:SetMinMaxValues(0, 1)
     pred:SetValue(0)
     pred:Hide()
     btn.healPredClip = predClip
     btn.healPred = pred
-
-    local incomingBar = btn.healthBar:CreateTexture(nil, "ARTWORK")
-    incomingBar:SetPoint("TOPLEFT", btn.healthBar, "TOPLEFT")
-    incomingBar:SetPoint("BOTTOMLEFT", btn.healthBar, "BOTTOMLEFT")
-    incomingBar:SetTexture(EvsHL.FLAT)
-    incomingBar:Hide()
-    btn.incomingBar = incomingBar
     btn.roleIcon = btn.healthBar:CreateTexture(nil, "OVERLAY")
     btn.roleIcon:SetWidth(20)
     btn.roleIcon:SetHeight(20)
@@ -272,6 +280,18 @@ function EvsHL.CreateUnitButton(index)
     btn.raidTargetIcon:SetHeight(16)
     btn.raidTargetIcon:SetPoint("TOP", btn, "TOP", 0, -1)
     btn.raidTargetIcon:Hide()
+    local resourceBar = CreateFrame("StatusBar", nil, btn)
+    resourceBar:SetFrameLevel(btn.healthBar:GetFrameLevel() + 4)
+    resourceBar:SetStatusBarTexture(EvsHL.FLAT)
+    resourceBar:SetMinMaxValues(0, 1)
+    resourceBar:SetValue(0)
+    resourceBar.background = resourceBar:CreateTexture(nil, "BACKGROUND")
+    resourceBar.background:SetAllPoints(resourceBar)
+    resourceBar.background:SetTexture(EvsHL.FLAT)
+    resourceBar.background:SetVertexColor(0, 0, 0, 0.85)
+    resourceBar:Hide()
+    btn.resourceBar = resourceBar
+    LayoutResourceBar(btn, EvsHL.S or EvsHL.DEFAULTS)
     local textLayer = CreateFrame("Frame", nil, btn)
     textLayer:SetAllPoints(btn)
     textLayer:SetFrameLevel(btn:GetFrameLevel() + 20)

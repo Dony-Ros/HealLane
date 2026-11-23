@@ -88,16 +88,17 @@ function EvsHL.RealData(btn)
     btn.max = UnitHealthMax(unit)
     btn.online = UnitIsConnected(unit)
     btn.dead = UnitIsDeadOrGhost(unit)
-    if not InCombatLockdown() then
+    if EvsHL.CanScanAuras() then
         btn.debuff = nil
         btn.debuffIconTexture = nil
         if S.debuffBorder or S.debuffIcon then
             local genericIcon
             for i = 1, #EvsHL.buttons do
                 local name, _, icon, _, debuffType = EvsHL.GetAura(unit, i, "HARMFUL")
+                if EvsHL.IsSecretValue(name) then break end
                 if not name then break end
                 if not genericIcon then genericIcon = icon end
-                if debuffType then
+                if not EvsHL.IsSecretValue(debuffType) and debuffType then
                     for _, entry in pairs((S.dispel and S.dispel.spells) or {}) do
                         if entry.spell and entry.spell ~= "" and entry.types and entry.types[debuffType] then
                             for _, knownSpell in ipairs(EvsHL.spells or {}) do
@@ -119,20 +120,33 @@ function EvsHL.RealData(btn)
             end
         end
         btn.missingBuff = false
+        btn.trackedHots = nil
         local unitInCombat = UnitAffectingCombat and UnitAffectingCombat(unit)
+        local canCheckCombat = S.checkBuffsInCombat
+            or (not EvsHL.IsSecretValue(unitInCombat) and not unitInCombat)
         if S.monitorMissingBuffs and S.trackBuffs and next(S.trackBuffs) and not btn.isPet
             and UnitIsVisible(unit)
-            and (S.checkBuffsInCombat or not unitInCombat) then
+            and canCheckCombat then
             local buffs = {}
+            local completeScan = true
             for i = 1, #EvsHL.buttons do
-                local name, _, _, _, _, duration, expires = EvsHL.GetAura(unit, i, "HELPFUL")
-                if not name then break end
-                buffs[name] = math.max(buffs[name] or 0, EvsHL.BuffRemaining(duration, expires))
-            end
-            for buffName, target in pairs(S.trackBuffs) do
-                if EvsHL.BuffTargetMatches(btn, target) and EvsHL.BuffLacking(buffs, buffName) then
-                    btn.missingBuff = true
+                local name, _, _, _, _, duration, expires, _, _, _, spellID = EvsHL.GetAura(unit, i, "HELPFUL")
+                if EvsHL.IsSecretValue(name) then
+                    completeScan = false
                     break
+                end
+                if not name then break end
+                if not EvsHL.RecordBuffAura(buffs, name, spellID, duration, expires) then
+                    completeScan = false
+                    break
+                end
+            end
+            if completeScan then
+                for buffName, target in pairs(S.trackBuffs) do
+                    if EvsHL.BuffTargetMatches(btn, target) and EvsHL.BuffLacking(buffs, buffName) then
+                        btn.missingBuff = true
+                        break
+                    end
                 end
             end
         end
@@ -140,21 +154,42 @@ function EvsHL.RealData(btn)
         if S.showHots or S.showIncoming then
             for i = 1, #EvsHL.buttons do
                 local name, _, icon, _, _, duration, expires, caster, _, _, spellId = EvsHL.GetAura(unit, i, "HELPFUL")
+                if EvsHL.IsSecretValue(name) then break end
                 if not name then break end
-                if caster == "player" and S.hots[name] and spellId and EvsHL.LearnHotID(name, spellId) then
+                local fromPlayer = not EvsHL.IsSecretValue(caster) and caster == "player"
+                if fromPlayer and S.hots[name] and spellId and EvsHL.LearnHotID(name, spellId) then
                     EvsHL.RefreshNativeAuraFrames()
                 end
-                if caster == "player" and S.hots[name] and btn.nh < EvsHL.MAX_HOTS then
+                if fromPlayer and S.hots[name] and btn.nh < EvsHL.MAX_HOTS then
                     btn.nh = btn.nh + 1
                     local h = btn.hots[btn.nh] or {}
                     btn.hots[btn.nh] = h
+                    h.name = name
                     h.icon = icon
                     h.duration = duration or 0
                     h.expires = expires or 0
-                    h.rate = S.showIncoming and EvsHL.HotRate(name) or 0
+                    h.rate = EvsHL.HotRate(name)
                 end
             end
         end
+    else
+        btn.missingBuff = nil
+        local oldCount = btn.nh or 0
+        local kept = 0
+        for i = 1, oldCount do
+            local hot = btn.hots[i]
+            local expires = hot and hot.expires
+            local active = hot and (EvsHL.IsSecretValue(expires)
+                or (type(expires) == "number" and expires > now))
+            if active then
+                kept = kept + 1
+                btn.hots[kept] = hot
+            end
+        end
+        for i = kept + 1, oldCount do
+            btn.hots[i] = nil
+        end
+        btn.nh = kept
     end
     btn.cast = 0
     if btn.incoming then

@@ -7,7 +7,9 @@
   <Script file="HealLane.lua" />
   <!-- Feature modules (order matters only for the module-level hooks they export). -->
   <Script file="HealLane_Roles.lua" />
+  <Script file="HealLane_RaidIcons.lua" />
   <Script file="HealLane_Sorting.lua" />
+  <Script file="HealLane_BlizzardFrames.lua" />
   <Script file="HealLane_Spells.lua" />
   <Script file="HealLane_Auras.lua" />
   <Script file="HealLane_SmartCast.lua" />
@@ -15,22 +17,21 @@
   <Script file="HealLane_UpdateVisuals.lua" />
   <Script file="HealLane_Refresh.lua" />
   <Script file="HealLane_Units.lua" />
-  <Script file="HealLane_FiveSecond.lua" />
-  <Script file="HealLane_ChatRoles.lua" />
-  <Script file="HealLane_NameAlert.lua" />
-  <Script file="HealLane_LootRolls.lua" />
-  <Script file="HealLane_AutoEnchant.lua" />
+  <!-- Mods -->
+  <Script file="Mods/HealLane_ChatRoles.lua" />
+  <Script file="Mods/HealLane_NameAlert.lua" />
   <!-- Config UI (unchanged). -->
-  <Script file="HealLaneConfig_App_General.lua" />
-  <Script file="HealLaneConfig_App_Healing.lua" />
-  <Script file="HealLaneConfig_App_Bars.lua" />
-  <Script file="HealLaneConfig_App_Icons.lua" />
-  <Script file="HealLaneConfig_App_Incoming.lua" />
-  <Script file="HealLaneConfig.lua" />
-  <Script file="HealLaneConfig_Cure.lua" />
-  <Script file="HealLaneConfig_Debuffs.lua" />
-  <Script file="HealLaneConfig_Buffs.lua" />
-  <Script file="HealLaneConfig_Mods.lua" />
+  <Script file="Tabs/HealLaneConfig_App_General.lua" />
+  <Script file="Tabs/HealLaneConfig_App_Healing.lua" />
+  <Script file="Tabs/HealLaneConfig_App_Bars.lua" />
+  <Script file="Tabs/HealLaneConfig_App_Icons.lua" />
+  <Script file="Tabs/HealLaneConfig_App_Sorting.lua" />
+  <Script file="Tabs/HealLaneConfig.lua" />
+  <Script file="Tabs/HealLaneConfig_Cure.lua" />
+  <Script file="Tabs/HealLaneConfig_Debuffs.lua" />
+  <Script file="Tabs/HealLaneConfig_Buffs.lua" />
+  <Script file="Tabs/HealLaneConfig_Mods.lua" />
+
 <StatusBar name="HealLaneHealthBarTemplate" virtual="true">
     <Size><AbsDimension x="125" y="50"/></Size>
     <Layers>

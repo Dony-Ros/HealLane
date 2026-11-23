@@ -30,16 +30,6 @@ function EvsHL.GetDispelColor(typeName)
     return { f.r, f.g, f.b }
 end
 
-function EvsHL.RecolorDispelTints(btn)
-    local tints = btn.dispelTints
-    if not tints then return end
-    local alpha = EvsHL.S.barAlpha
-    for typeName, tint in pairs(tints) do
-        local c = EvsHL.GetDispelColor(typeName)
-        EvsHL.SetTextureColor(tint, c[1], c[2], c[3], alpha)
-    end
-end
-
 local AddAuraSlot, ApplyHoTFlowLayout, BuildDispelSlotOptions, BuildHoTGroupOptions, BuildSingleDispelSlot, InitializeAuraIcon, InitializeAuraIconDuration, InitializeAuraIconTexture
 local function GetNativeAuraSelection()
     local curS = EvsHL.S
@@ -101,6 +91,9 @@ local function GetNativeAuraSelection()
     end
     for _, dispelType in ipairs(dispelTypes) do
         signature[#signature + 1] = "d" .. dispelType
+        local color = EvsHL.GetDispelColor(dispelType)
+        signature[#signature + 1] = "c" .. dispelType .. ":" .. tostring(color[1]) .. ","
+            .. tostring(color[2]) .. "," .. tostring(color[3]) .. ":" .. tostring(curS.barAlpha)
     end
     local ignoredIDs = {}
     for spellID in pairs(ignoredSpellIDs) do ignoredIDs[#ignoredIDs + 1] = spellID end
@@ -172,7 +165,6 @@ local function RetireNativeAuraContainer(btn)
     btn.nativeAuraContainer = nil
     btn.nativeDispelSlots = nil
     btn.nativeDispelActive = nil
-    btn.dispelTints = nil
     btn.nativeAuraSignature = nil
     btn.nativeAuraUnit = nil
     btn.nativeAurasActive = false
@@ -239,7 +231,6 @@ end
 local function BuildDispelSlots(btn, container, dispelTypes, ignoredSpellIDs)
     btn.nativeDispelSlots = {}
     btn.nativeDispelActive = {}
-    btn.dispelTints = {}
 
     local dispelCount = #dispelTypes
     for i, dispelType in ipairs(dispelTypes) do
@@ -254,12 +245,9 @@ BuildSingleDispelSlot = function(btn, container, index, typeName, dispelCount, i
     local curS = EvsHL.S
     local options = BuildDispelSlotOptions(btn, index, typeName, dispelCount, curS, ignoredSpellIDs)
 
-    local success, slot = AddAuraSlot(container, "heallane-dispel-" .. typeName, "HARMFUL", options)
+    local success = AddAuraSlot(container, "heallane-dispel-" .. typeName, "HARMFUL", options)
     if not success then return false end
 
-    slot:SetSize(14, 14)
-    PositionNativeAuraIcon(slot, btn, index, dispelCount, 14, curS.debuffIconAnchor or "BOTTOMLEFT")
-    btn.nativeDispelSlots[typeName] = slot
     return true
 end
 local function EnableNativeAuraContainer(btn, container)
@@ -289,7 +277,6 @@ BuildDispelSlotOptions = function(btn, index, typeName, dispelCount, curS, ignor
                 local c = EvsHL.GetDispelColor(typeName)
                 EvsHL.SetTextureColor(tint, c[1], c[2], c[3], curS.barAlpha)
                 created.healLaneTint = true
-                btn.dispelTints[typeName] = tint
             end)
         end,
     }
@@ -389,6 +376,11 @@ local function CreateNativeAuraContainer(btn)
     btn.nativeAuraContainer = container
     container:SetAllPoints(btn)
     container:SetFrameLevel(btn:GetFrameLevel() + 8)
+    if CustomAuraContainerAuraProcessingPolicy
+        and container.SetAuraProcessingPolicy
+        and CustomAuraContainerAuraProcessingPolicy.None ~= nil then
+        pcall(container.SetAuraProcessingPolicy, container, CustomAuraContainerAuraProcessingPolicy.None)
+    end
 
     local bound, bindError = pcall(container.SetUnit, container, btn.unit)
     if not bound then

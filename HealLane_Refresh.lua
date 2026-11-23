@@ -14,29 +14,102 @@ function EvsHL.UpdateButton(btn)
     local S = EvsHL.S
     local now = GetTime()
     if btn.sim then EvsHL.SimData(btn) else EvsHL.RealData(btn) end
+    local rangeFallbackAlpha = S.rangeFallbackAlpha or 0.3
     local threat = not btn.sim and ThreatLevel(btn.unit)
     btn.hasAggro = not btn.sim and S.aggroHighlight and not EvsHL.IsSecretValue(threat)
         and (threat or 0) >= 2
     local rangeAlpha = 1
+    local distanceKnown = false
+    btn.outOfRange = false
+    btn.rangeInRange = nil
+    btn.hasSecretRange = false
+    btn.hasRangeValue = false
+    btn.nearbyRange = nil
+    btn.hasNearbyRange = false
     if not btn.sim and not UnitIsUnit(btn.unit, "player") then
-        if UnitDistanceSquared then
-            local distanceSquared = UnitDistanceSquared(btn.unit)
-            local fadeDistance = S.rangeFadeDistance or 60
-            if distanceSquared and distanceSquared >= (fadeDistance * 2.5) ^ 2 then
-                rangeAlpha = 0.3
-            elseif distanceSquared and distanceSquared >= fadeDistance ^ 2 then
-                rangeAlpha = 0.5
+        local inInstance = false
+        if IsInInstance then inInstance = IsInInstance() end
+        local isGroupUnit = (UnitInParty and UnitInParty(btn.unit))
+            or (UnitInRaid and UnitInRaid(btn.unit))
+        if UnitInRange then
+            local inRange, checkedRange = UnitInRange(btn.unit)
+            local inRangeIsSecret = EvsHL.IsSecretValue(inRange)
+            local checkedRangeIsSecret = EvsHL.IsSecretValue(checkedRange)
+            local canCheckRange = false
+            if checkedRangeIsSecret or inRangeIsSecret then
+                canCheckRange = isGroupUnit and true or false
+            elseif checkedRange == true or checkedRange == 1 then
+                canCheckRange = true
+            elseif isGroupUnit and checkedRange == nil then
+                canCheckRange = true
             end
+            if canCheckRange then
+                if EvsHL.IsSecretValue(inRange) then
+                    btn.rangeInRange = inRange
+                    btn.hasSecretRange = true
+                    btn.nearbyRange = inRange
+                    btn.hasNearbyRange = true
+                else
+                    local knownRange = inRange == true or inRange == false or inRange == 1 or inRange == 0
+                    if knownRange then
+                        local inSpellRange = inRange == true or inRange == 1
+                        btn.rangeInRange = inSpellRange
+                        btn.hasRangeValue = true
+                        btn.nearbyRange = inSpellRange
+                        btn.hasNearbyRange = true
+                        if not inSpellRange then
+                            btn.outOfRange = true
+                        end
+                    end
+                end
+            end
+        end
+        if UnitDistanceSquared then
+            local distanceSquared, checkedDistance = UnitDistanceSquared(btn.unit)
+            local fadeDistance = S.rangeFadeDistance or 60
+            local farFadeDistance = S.farFadeDistance or 200
+            local checkedDistanceIsSecret = EvsHL.IsSecretValue(checkedDistance)
+            local distanceIsValid = false
+            if not checkedDistanceIsSecret then
+                distanceIsValid = checkedDistance == nil or checkedDistance == true or checkedDistance == 1
+            end
+            if distanceIsValid and not EvsHL.IsSecretValue(distanceSquared) and type(distanceSquared) == "number" then
+                distanceKnown = true
+                if distanceSquared >= farFadeDistance ^ 2 then
+                    rangeAlpha = math.min(rangeAlpha, rangeFallbackAlpha)
+                    btn.outOfRange = true
+                elseif isGroupUnit and distanceSquared >= fadeDistance ^ 2 then
+                    rangeAlpha = math.min(rangeAlpha, 0.5)
+                end
+            end
+            if not btn.hasNearbyRange and distanceKnown then
+                btn.nearbyRange = distanceSquared < fadeDistance ^ 2
+                btn.hasNearbyRange = true
+            end
+        end
+        if inInstance and isGroupUnit and not distanceKnown and not btn.hasNearbyRange then
+            btn.rangeInRange = false
+            btn.hasRangeValue = true
+            btn.nearbyRange = false
+            btn.hasNearbyRange = true
+            btn.outOfRange = true
+        end
+        if not distanceKnown and btn.hasRangeValue and not btn.rangeInRange then
+            rangeAlpha = math.min(rangeAlpha, rangeFallbackAlpha)
         end
     end
     if not btn.sim and UnitInVehicle and UnitInVehicle(btn.unit) then
         rangeAlpha = math.min(rangeAlpha, 0.7)
     end
-    if not InCombatLockdown() then btn:SetAlpha(rangeAlpha) end
+    if btn.SetAlphaFromBoolean and not distanceKnown and btn.hasSecretRange then
+        btn:SetAlphaFromBoolean(btn.rangeInRange, 1, rangeFallbackAlpha)
+    else
+        btn:SetAlpha(rangeAlpha)
+    end
     EvsHL.UpdateDebuff(btn)
     EvsHL.UpdateHealth(btn)
-    EvsHL.UpdateHealPrediction(btn)
-    EvsHL.UpdateIncoming(btn, now)
+    EvsHL.UpdateResourceBar(btn)
+    EvsHL.UpdateHealPrediction(btn, now)
     EvsHL.UpdateHoTs(btn, now)
     EvsHL.UpdateBuff(btn)
     if btn.hasAggro then
@@ -74,22 +147,21 @@ local function RankNumber(rank)
     return type(rank) == "string" and tonumber(rank:match("(%d+)")) or nil
 end
 
-function EvsHL.GetClickRank(btn, slotKey)
+function EvsHL.GetSpellRankForUnit(spellName, unit, selectedRank)
     local S = EvsHL.S
-    local selectedRank = S.clickRanks and S.clickRanks[slotKey]
-    if not S.autoDownrank or not btn or btn.sim or not btn.unit then
+    if not S.autoDownrank or not spellName or not unit then
         return selectedRank
     end
 
-    local spellName = S.clicks[slotKey]
-    local learnLevels = spellName and EvsHL.SPELL_RANK_LEARN_LEVELS[spellName]
     local entry = spellName and EvsHL.FindSpell(spellName)
-    if not learnLevels or not entry or not entry.ranks then
+    local fallbackLevels = EvsHL.SPELL_RANK_LEARN_LEVELS[spellName]
+    if not entry or not entry.ranks
+        or (not fallbackLevels and (not entry.rankLearnLevels or not next(entry.rankLearnLevels))) then
         return selectedRank
     end
 
-    local targetLevel = UnitLevel(btn.unit)
-    if type(targetLevel) ~= "number" or targetLevel < 1 then
+    local targetLevel = UnitLevel(unit)
+    if EvsHL.IsSecretValue(targetLevel) or type(targetLevel) ~= "number" or targetLevel < 1 then
         return selectedRank
     end
 
@@ -107,7 +179,8 @@ function EvsHL.GetClickRank(btn, slotKey)
             if not lowestNumber or number < lowestNumber then
                 lowestRank, lowestNumber = rank, number
             end
-            local learnedLevel = learnLevels[number]
+            local learnedLevel = entry.rankLearnLevels and entry.rankLearnLevels[number]
+                or fallbackLevels and fallbackLevels[number]
             if learnedLevel and targetLevel >= math.max(1, learnedLevel - 10)
                 and (not bestNumber or number > bestNumber) then
                 bestRank, bestNumber = rank, number
@@ -115,6 +188,13 @@ function EvsHL.GetClickRank(btn, slotKey)
         end
     end
     return bestRank or lowestRank or selectedRank
+end
+
+function EvsHL.GetClickRank(btn, slotKey)
+    local S = EvsHL.S
+    local selectedRank = S.clickRanks and S.clickRanks[slotKey]
+    if not btn or btn.sim or not btn.unit then return selectedRank end
+    return EvsHL.GetSpellRankForUnit(S.clicks[slotKey], btn.unit, selectedRank)
 end
 
 function EvsHL.ApplyClicks(btn, blank)
@@ -203,7 +283,7 @@ function EvsHL.Refresh()
         end
     end
     local petsOrdered = false
-    if (S.sortByRole or next(S.roleOverrides or {})) and (#list + #petList) > 1 then
+    if S.sortByRole and (#list + #petList) > 1 then
         local combined = {}
         for _, u in ipairs(list) do combined[#combined + 1] = u end
         for _, u in ipairs(petList) do combined[#combined + 1] = u end
@@ -218,7 +298,13 @@ function EvsHL.Refresh()
     if not petsOrdered then
         if #list > 1 then
             table.sort(list, function(a, b)
-                return (UnitName(a) or a) < (UnitName(b) or b)
+                local nameA, nameB = UnitName(a), UnitName(b)
+                if EvsHL.IsSecretValue(nameA) or EvsHL.IsSecretValue(nameB)
+                    or (nameA ~= nil and type(nameA) ~= "string")
+                    or (nameB ~= nil and type(nameB) ~= "string") then
+                    return a < b
+                end
+                return (nameA or a) < (nameB or b)
             end)
         end
         for _, u in ipairs(petList) do list[#list + 1] = u end
@@ -245,6 +331,13 @@ function EvsHL.Refresh()
         local btn = EvsHL.buttons[i] or EvsHL.CreateUnitButton(i)
         local unit = list[i]
         if unit then
+            if btn.unit ~= unit then
+                btn.nh = 0
+                btn.trackedHots = nil
+                btn.incoming = nil
+                btn.incomingSpell = nil
+                btn.incomingEnd = nil
+            end
             btn:SetWidth(S.width)
             btn:SetHeight(S.height)
             btn.font:SetWidth(math.max(S.width - 4, 10))
@@ -290,6 +383,7 @@ function EvsHL.Refresh()
                 end
                 btn:Show()
                 EvsHL.UpdateUnitRoleIcon(btn)
+                EvsHL.UpdateUnitRaidIcon(btn)
                 EvsHL.UpdateName(btn)
             elseif unit == "target" then
                 btn.sim = nil
@@ -306,6 +400,7 @@ function EvsHL.Refresh()
                 end
                 btn:Show()
                 EvsHL.UpdateName(btn)
+                EvsHL.UpdateUnitRaidIcon(btn)
             else
                 btn.sim = nil
                 btn.unit = unit

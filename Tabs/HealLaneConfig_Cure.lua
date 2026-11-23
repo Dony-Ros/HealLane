@@ -6,9 +6,9 @@ function EvsHL.BuildCureTab(page)
     local MAXROWS = 6
     local rows = {}
     local List
-    H.Label(page, "Smart Cast Dispel Spells", 25, -20)
-    H.Label(page, "Add spells and check which debuffs they can remove.", 25, -36)
-    H.AddButton(page, "Add Dispel Spell...", 25, -55, 160, function()
+    local box = H.Section(page, "Smart Cast Dispel Spells", -4, 288)
+    H.Note(box, "Add spells and check which debuffs they can remove.", 12, -26)
+    H.AddButton(box, "Add Dispel Spell...", 12, -44, 160, function()
         H.OpenPicker(false, "Add Dispel Spell", function(e)
             local count = 0
             for _ in pairs(S.dispel.spells) do count = count + 1 end
@@ -36,10 +36,10 @@ function EvsHL.BuildCureTab(page)
             or (count == 1 and "1 type selected" or count .. " types selected"))
     end
     for i = 1, MAXROWS do
-        local row = CreateFrame("Frame", nil, page)
-        row:SetWidth(460)
+        local row = CreateFrame("Frame", nil, box)
+        row:SetWidth(436)
         row:SetHeight(32)
-        row:SetPoint("TOPLEFT", 25, -85 - (i - 1) * 34)
+        row:SetPoint("TOPLEFT", 12, -78 - (i - 1) * 34)
         row.icon = row:CreateTexture(nil, "ARTWORK")
         row.icon:SetWidth(18)
         row.icon:SetHeight(18)
@@ -106,11 +106,11 @@ function EvsHL.BuildCureTab(page)
         end
     end
     EvsHL.AddConfigWidget(List)
-    H.Label(page, "Debuff type colors", 25, -340)
+    local colorBox = H.Section(page, "Debuff type colors", -300, 116)
     for i, tName in ipairs(types) do
         local column = (i - 1) % 2
         local row = math.floor((i - 1) / 2)
         local colorKey = "debuff" .. tName .. "Color"
-        H.AddColor(page, tName, 25 + column * 235, -365 - row * 28, colorKey, EvsHL.ApplyVisuals)
+        H.AddColor(colorBox, tName, 14 + column * 229, -30 - row * 28, colorKey, EvsHL.ApplyVisuals)
     end
 end

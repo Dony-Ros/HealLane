@@ -40,7 +40,18 @@ function EvsHL.IsSpellInRange(spell, unit)
     if inRange == true or inRange == 1 then return true end
     if inRange == false or inRange == 0 then return false end
 end
+function EvsHL.CanScanAuras()
+    if EvsHL.nativeAuraSupported and InCombatLockdown and InCombatLockdown() then return false end
+    if IsInInstance then
+        local inInstance, instanceType = IsInInstance()
+        if inInstance and (instanceType == "pvp" or instanceType == "arena") then
+            return false
+        end
+    end
+    return true
+end
 function EvsHL.GetAura(unit, index, filter)
+    if not EvsHL.CanScanAuras() then return nil end
     if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
         local aura = C_UnitAuras.GetAuraDataByIndex(unit, index, filter)
         if not aura then return nil end
@@ -103,12 +114,13 @@ local function Init()
             end
         end
     end
-    S.ver = 6
+    if old < 9 and S.rangeFallbackAlpha == 0.3 then S.rangeFallbackAlpha = 0.05 end
+    S.ver = 9
     S.healthText = nil
     EvsHL.Merge(S, EvsHL.DEFAULTS)
     for _, key in ipairs({
         "debuffCurseColor", "debuffPoisonColor", "debuffDiseaseColor", "debuffMagicColor",
-        "debuffBleedColor", "aggroColor", "thresholdColor", "barColor",
+        "debuffBleedColor", "aggroColor", "thresholdColor", "barColor", "nearbyColor",
     }) do
         if type(S[key]) ~= "table" then
             S[key] = EvsHL.Copy(EvsHL.DEFAULTS[key])
@@ -126,6 +138,7 @@ local function Init()
             "this client has no native AuraContainer; HoTs and debuffs cannot be refreshed during combat.")
     end
     EvsHL.ApplyPosition()
+    if EvsHL.ApplyBlizzardRaidFrames then EvsHL.ApplyBlizzardRaidFrames() end
 end
 function EvsHL.SetSimulation(count)
     EvsHL.simCount = count or 0
@@ -143,6 +156,7 @@ function EvsHL.ResetAll()
     wipe(S)
     EvsHL.Merge(S, EvsHL.DEFAULTS)
     EvsHL.ApplyPosition()
+    if EvsHL.ApplyBlizzardRaidFrames then EvsHL.ApplyBlizzardRaidFrames(true) end
     EvsHL.Refresh()
 end
 -- ============================================================
@@ -203,6 +217,7 @@ end
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 local roleClearEvents = {
     GROUP_ROSTER_UPDATE = true,
@@ -226,7 +241,9 @@ for _, e in ipairs({ "GROUP_ROSTER_UPDATE", "PARTY_MEMBERS_CHANGED", "RAID_ROSTE
     "ZONE_CHANGED_NEW_AREA", "LFG_UPDATE", "LFG_ROLE_CHECK_SHOW", "LFG_ROLE_CHECK_HIDE", "LFG_ROLE_CHECK_ROLE_CHOSEN",
     "LFG_PROPOSAL_SHOW", "PLAYER_ROLES_ASSIGNED", "LFG_PROPOSAL_UPDATE", "LFG_PROPOSAL_SUCCEEDED", "ROLE_CHANGED_INFORM",
     "SPELLS_CHANGED", "LEARNED_SPELL_IN_TAB", "SPELL_TEXT_UPDATE", "UNIT_LEVEL", "PLAYER_LEVEL_UP",
-    "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_DELAYED", "RAID_TARGET_UPDATE", "UNIT_PET" }) do
+    "UNIT_HEALTH", "UNIT_HEALTH_FREQUENT", "UNIT_MAXHEALTH", "UNIT_FLAGS", "UNIT_CONNECTION",
+    "UNIT_THREAT_SITUATION_UPDATE", "UNIT_THREAT_LIST_UPDATE",
+    "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_DELAYED", "RAID_TARGET_UPDATE", "UNIT_PET" }) do
     pcall(frame.RegisterEvent, frame, e)
 end
 frame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
@@ -239,13 +256,44 @@ frame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
         else
             EvsHL.ApplyVisuals()
         end
+    elseif event == "PLAYER_TARGET_CHANGED" then
+        for _, btn in pairs(EvsHL.buttons) do
+            if btn.unit == "target" then
+                btn.nh = 0
+                btn.trackedHots = nil
+                btn.incoming = nil
+                btn.incomingSpell = nil
+                btn.incomingEnd = nil
+            end
+        end
+        if S and not InCombatLockdown() then EvsHL.Refresh() end
+    elseif event == "UNIT_HEALTH" or event == "UNIT_HEALTH_FREQUENT"
+        or event == "UNIT_MAXHEALTH" or event == "UNIT_FLAGS" or event == "UNIT_CONNECTION"
+        or event == "UNIT_THREAT_SITUATION_UPDATE" or event == "UNIT_THREAT_LIST_UPDATE" then
+        if S and type(arg1) == "string" then
+            for _, btn in pairs(EvsHL.buttons) do
+                if btn.unit and btn:IsShown() then
+                    local matches = UnitIsUnit(btn.unit, arg1)
+                    if not EvsHL.IsSecretValue(matches) and matches then
+                        EvsHL.UpdateButton(btn)
+                    end
+                end
+            end
+        end
     elseif event == "UNIT_SPELLCAST_SENT" then
         if not S or not S.showIncoming then return end
         if arg1 == "player" then
+            local clickTarget = EvsHL.pendingClickTarget
+            local targetUnit = clickTarget and GetTime() - clickTarget.time <= 2 and clickTarget.unit
+            EvsHL.pendingClickTarget = nil
             if type(arg4) == "number" then
-                EvsHL.pendingCast = { spell = EvsHL.SpellNameFromCastEvent(arg2, arg4), target = arg2 }
+                EvsHL.pendingCast = {
+                    spell = EvsHL.SpellNameFromCastEvent(arg2, arg4),
+                    target = arg2,
+                    targetUnit = targetUnit,
+                }
             else
-                EvsHL.pendingCast = { spell = arg2, target = arg4 }
+                EvsHL.pendingCast = { spell = arg2, target = arg4, targetUnit = targetUnit }
             end
         else
             EvsHL.pendingCast = nil
@@ -253,6 +301,13 @@ frame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
     elseif event == "UNIT_SPELLCAST_START" then
         if not S or not S.showIncoming then return end
         if arg1 == "player" then EvsHL.StartIncoming(EvsHL.SpellNameFromCastEvent(arg2, arg3)) end
+    elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+        if not S or not S.showIncoming or arg1 ~= "player" then return end
+        local spell = EvsHL.SpellNameFromCastEvent(arg2, arg3)
+        local pendingCast = EvsHL.pendingCast
+        if pendingCast and pendingCast.spell == spell then
+            EvsHL.TrackHotCast(pendingCast.target, spell, pendingCast.targetUnit)
+        end
     elseif event == "UNIT_SPELLCAST_DELAYED" then
         if not S or not S.showIncoming then return end
         if arg1 == "player" then
@@ -280,7 +335,10 @@ frame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
         if S and roleClearEvents[event] and EvsHL.NumRaid() == 0 and EvsHL.NumParty() == 0 then
             S.roleOverrides = {}
         end
-        if event == "PLAYER_ENTERING_WORLD" and S then EvsHL.ScanSpells() end
+        if event == "PLAYER_ENTERING_WORLD" and S then
+            EvsHL.ScanSpells()
+            EvsHL.Refresh()
+        end
         if rosterRefreshEvents[event] then
             rosterRefreshRemaining = 0.3
         else
@@ -306,19 +364,44 @@ SlashCmdList["HLRAID"] = function(msg)
     for _, btn in ipairs(EvsHL.buttons) do
         if btn:IsShown() and btn.unit and not btn.sim then
             local ok, index = pcall(GetRaidTargetIndex, btn.unit)
-            if EvsHL.IsSecretValue(index) and SetRaidTargetIconTexture then
-                local probe = btn.raidProbe or btn:CreateTexture(nil, "OVERLAY")
-                btn.raidProbe = probe
-                probe:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-                local okNative, err = pcall(SetRaidTargetIconTexture, probe, index)
-                say("native SetRaidTargetIconTexture ok=" .. tostring(okNative) .. (okNative and "" or (" err=" .. tostring(err))))
-            end
-            say(tostring(btn.unit) .. " ok=" .. tostring(ok) .. " secret=" .. tostring(EvsHL.IsSecretValue(index))
-                .. " index=" .. (EvsHL.IsSecretValue(index) and "?" or tostring(index))
+            local secret = EvsHL.IsSecretValue(index)
+            say(tostring(btn.unit) .. " ok=" .. tostring(ok) .. " secret=" .. tostring(secret)
+                .. " index=" .. (secret and "restricted; not passed to marker API" or tostring(index))
                 .. " shown=" .. tostring(btn.raidTargetIcon:IsShown())
                 .. " tex=" .. tostring(btn.raidTargetIcon:GetTexture()))
             return
         end
     end
     say("no unit button shown")
+end
+SLASH_HLBUFF1 = "/hlbuff"
+SlashCmdList["HLBUFF"] = function()
+    local S = EvsHL.S
+    local say = function(t) DEFAULT_CHAT_FRAME:AddMessage("HLBuff: " .. t) end
+    say("native=" .. tostring(EvsHL.nativeAuraSupported) .. " canScan=" .. tostring(EvsHL.CanScanAuras())
+        .. " monitor=" .. tostring(S.monitorMissingBuffs) .. " border=" .. tostring(S.buffBorder)
+        .. " combatCheck=" .. tostring(S.checkBuffsInCombat))
+    local n = 0
+    for k, v in pairs(S.trackBuffs) do n = n + 1; say("track " .. k .. " -> " .. tostring(v)) end
+    say("tracked=" .. n)
+    for _, btn in ipairs(EvsHL.buttons) do
+        if btn:IsShown() and btn.unit and not btn.sim then
+            local buffs = {}
+            for i = 1, 40 do
+                local name, _, _, _, _, d, e, _, _, _, id = EvsHL.GetAura(btn.unit, i, "HELPFUL")
+                if EvsHL.IsSecretValue(name) then break end
+                if not name then break end
+                EvsHL.RecordBuffAura(buffs, name, id, d, e)
+            end
+            local lacking = {}
+            for b, t in pairs(S.trackBuffs) do
+                lacking[#lacking + 1] = b .. ":match=" .. tostring(EvsHL.BuffTargetMatches(btn, t))
+                    .. ",lack=" .. tostring(EvsHL.BuffLacking(buffs, b))
+            end
+            say(btn.unit .. " role=" .. tostring(btn.role) .. " pet=" .. tostring(btn.isPet)
+                .. " visible=" .. tostring(UnitIsVisible(btn.unit)) .. " missing=" .. tostring(btn.missingBuff)
+                .. " | " .. table.concat(lacking, "; "))
+            return
+        end
+    end
 end

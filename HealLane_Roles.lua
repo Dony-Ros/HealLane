@@ -1,4 +1,4 @@
--- Role detection, role icons, raid markers, and the Shift+wheel role menu.
+-- Role detection, role icons, and the Shift+wheel role menu.
 local EvsHL = EvsHL
 local function NormalizeRole(role)
     if type(role) ~= "string" or EvsHL.IsSecretValue(role) then return nil end
@@ -52,6 +52,7 @@ end
 local function UnitRole(unit)
     local S = EvsHL.S
     local guid = UnitGUID and UnitGUID(unit)
+    if EvsHL.IsSecretValue(guid) or type(guid) ~= "string" then guid = nil end
     local override = guid and S and S.roleOverrides and S.roleOverrides[guid]
     if override == "TANK" or override == "HEALER" then return override end
     local role = AssignedRole(unit)
@@ -92,23 +93,12 @@ EvsHL.Role_Icons = {
     ["DPS"]    = [[Interface\Addons\HealLane\Textures\role\1\dps.tga]],
     ["CUSTOM"] = [[Interface\Addons\HealLane\Textures\role\1\dps.tga]],
 }
-EvsHL.Raid_Textures = {
-    [1] = [[Interface\Addons\HealLane\Textures\raid\1\star.tga]],
-    [2] = [[Interface\Addons\HealLane\Textures\raid\1\circle.tga]],
-    [3] = [[Interface\Addons\HealLane\Textures\raid\1\diamond.tga]],
-    [4] = [[Interface\Addons\HealLane\Textures\raid\1\triangle.tga]],
-    [5] = [[Interface\Addons\HealLane\Textures\raid\1\moon.tga]],
-    [6] = [[Interface\Addons\HealLane\Textures\raid\1\square.tga]],
-    [7] = [[Interface\Addons\HealLane\Textures\raid\1\cross.tga]],
-    [8] = [[Interface\Addons\HealLane\Textures\raid\1\skull.tga]],
-}
 local function IsGrouped()
     return EvsHL.NumRaid() > 0 or EvsHL.NumParty() > 0
 end
 function EvsHL.UpdateUnitRoleIcon(btn)
     local S = EvsHL.S
     if btn.sim then
-        btn.raidTargetIcon:Hide()
         local role = EvsHL.SimRole(btn.sim, EvsHL.simCount or 0)
         if role == "PLAYER" then role = "HEALER" end
         btn.role = role
@@ -122,7 +112,6 @@ function EvsHL.UpdateUnitRoleIcon(btn)
     end
     if not btn.unit then
         btn.roleIcon:Hide()
-        btn.raidTargetIcon:Hide()
         return
     end
     if not S.showRoleIcon or not IsGrouped() then
@@ -136,44 +125,6 @@ function EvsHL.UpdateUnitRoleIcon(btn)
         btn.roleIcon:Hide()
     end
 end
-function EvsHL.UpdateUnitRaidIcon(btn)
-    local S = EvsHL.S
-    if btn.sim then
-        btn.raidTargetIcon:Hide()
-        return
-    end
-    if not btn.unit then
-        btn.roleIcon:Hide()
-        btn.raidTargetIcon:Hide()
-        return
-    end
-    local icon = btn.raidTargetIcon
-    if not S.showRaidIcon or not GetRaidTargetIndex or not SetRaidTargetIconTexture then
-        icon:Hide()
-        return
-    end
-    local ok, iconIndex = pcall(GetRaidTargetIndex, btn.unit)
-    if not ok then
-        icon:Hide()
-        return
-    end
-    if not EvsHL.IsSecretValue(iconIndex) and type(iconIndex) ~= "number" then
-        icon:Hide()
-        return
-    end
-    icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-    if pcall(SetRaidTargetIconTexture, icon, iconIndex) then
-        icon:Show()
-    else
-        icon:Hide()
-    end
-end
-function EvsHL.QueueUpdateUnitRaidIcons()
-    for i = 1, #EvsHL.buttons do
-        local btn = EvsHL.buttons[i]
-        if btn and btn:IsShown() and btn.unit then EvsHL.UpdateUnitRaidIcon(btn) end
-    end
-end
 -- Role menu (Shift + mouse wheel) -----------------------------
 local roleMenuFrame = CreateFrame("Frame", "EvsHLRoleMenu", UIParent, "UIDropDownMenuTemplate")
 function EvsHL.ShowRoleMenu(btn)
@@ -181,6 +132,7 @@ function EvsHL.ShowRoleMenu(btn)
     local unit = btn.unit
     if not unit or btn.sim then return end
     local guid = UnitGUID and UnitGUID(unit)
+    if EvsHL.IsSecretValue(guid) or type(guid) ~= "string" then guid = nil end
     local manualRole = guid and S.roleOverrides and S.roleOverrides[guid]
     UIDropDownMenu_Initialize(roleMenuFrame, function(self, level)
         local tankInfo = UIDropDownMenu_CreateInfo()
