@@ -21,6 +21,6 @@ function EvsHL.BuildAppGeneral(page)
     local rangeBox = H.Section(page, "Range", -102, 160)
     H.AddSlider(rangeBox, "Range fade starts (yd)", 20, -44, "rangeFadeDistance", 10, 120, 5, EvsHL.ApplyVisuals)
     H.AddSlider(rangeBox, "Far fade distance (yd)", 20, -82, "farFadeDistance", 200, 1000, 10, EvsHL.ApplyVisuals)
-    H.AddSlider(rangeBox, "Instance out-of-range alpha", 20, -120, "rangeFallbackAlpha", 0.05, 1, 0.05, EvsHL.ApplyVisuals)
-    H.Note(rangeBox, "Instances fade unchecked group units too.", 20, -148)
+    local instanceAlpha = H.AddSlider(rangeBox, "Instance out-of-range alpha", 20, -120, "rangeFallbackAlpha", 0.05, 1, 0.05, EvsHL.ApplyVisuals)
+    H.Tooltip(instanceAlpha, "In instances, unchecked group units fade to this alpha too.")
 end

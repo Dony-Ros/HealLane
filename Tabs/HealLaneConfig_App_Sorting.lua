@@ -1,14 +1,13 @@
 local EvsHL = EvsHL
 local FLAT = "Interface\\Buttons\\WHITE8x8"
-local ROLES = "Interface\\LFGFrame\\UI-LFG-ICON-ROLES"
 local CHIP_W, CHIP_H, GAP, PAD = 58, 48, 4, 3
 local TRACK_W, TRACK_H = 436, 58
 local KEYS = { "TANK", "PLAYER", "HEALER", "DPS", "PETS", "TARGET", "BREAK" }
 local CHIPS = {
-    TANK = { label = "Tank", color = { 0.35, 0.55, 1 }, texture = ROLES, coords = { 0, 19 / 64, 22 / 64, 41 / 64 }, tip = "Tanks" },
+    TANK = { label = "Tank", color = { 0.35, 0.55, 1 }, texture = EvsHL.Role_Icons.TANK, tip = "Tanks" },
     PLAYER = { label = "You", color = { 1, 0.82, 0.2 }, portrait = true, tip = "Your own frame" },
-    HEALER = { label = "Healer", color = { 0.3, 0.9, 0.4 }, texture = ROLES, coords = { 20 / 64, 39 / 64, 1 / 64, 20 / 64 }, tip = "Healers" },
-    DPS = { label = "DPS", color = { 0.95, 0.35, 0.35 }, texture = ROLES, coords = { 20 / 64, 39 / 64, 22 / 64, 41 / 64 }, tip = "Damage dealers and everyone else" },
+    HEALER = { label = "Healer", color = { 0.3, 0.9, 0.4 }, texture = EvsHL.Role_Icons.HEALER, tip = "Healers" },
+    DPS = { label = "DPS", color = { 0.95, 0.35, 0.35 }, texture = EvsHL.Role_Icons.DPS, tip = "Damage dealers and everyone else" },
     PETS = { label = "Pets", color = { 0.75, 0.55, 0.3 }, texture = "Interface\\Icons\\Ability_Hunter_MendPet", coords = { 0.08, 0.92, 0.08, 0.92 }, tip = "Pet frames" },
     TARGET = { label = "Target", color = { 0.7, 0.7, 0.7 }, texture = "Interface\\Icons\\Ability_Marksmanship", coords = { 0.08, 0.92, 0.08, 0.92 }, tip = "Temporary target frame" },
     BREAK = { label = "Break", color = { 1, 0.82, 0 }, tip = "Column break", desc = "Everything before it stacks in the first column. Everything after it fills the remaining columns." },
@@ -29,13 +28,13 @@ function EvsHL.BuildAppSorting(page)
 
     local roleBox = H.Section(page, "Role order", -4, 158)
     H.AddCheck(roleBox, "Enable role sorting", 8, -26, "sortByRole", Apply)
-    H.Note(roleBox, "Drag a role to reorder. Roles before the Break share the first column;", 12, -62)
-    H.Note(roleBox, "the rest fill the remaining columns.", 12, -74)
+    H.Tooltip(roleBox.titleButton, "Drag a role to reorder. Roles before the Break share the first column; roles after it fill the remaining columns.")
 
     local track = H.Backdrop("Frame", nil, roleBox)
     track:SetWidth(TRACK_W) track:SetHeight(TRACK_H) track:SetPoint("TOPLEFT", 12, -92)
     track:SetBackdrop({ bgFile = FLAT })
     track:SetBackdropColor(0, 0, 0, 0.35)
+    EvsHL.ConfigUI:StylePanel(track, EvsHL.ConfigUI:GetColors().panel)
     local slotTex = track:CreateTexture(nil, "BACKGROUND")
     slotTex:SetWidth(CHIP_W) slotTex:SetHeight(CHIP_H)
     slotTex:SetTexture(FLAT) slotTex:SetVertexColor(1, 1, 1, 0.12)
@@ -103,11 +102,16 @@ function EvsHL.BuildAppSorting(page)
         chip:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
         chip:SetBackdropColor(0, 0, 0, 0.7)
         chip:SetBackdropBorderColor(def.color[1], def.color[2], def.color[3], 1)
+        EvsHL.ConfigUI:StyleButton(chip)
         chip:SetHighlightTexture(FLAT) chip:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.12)
         chip.icon = chip:CreateTexture(nil, "ARTWORK")
         chip.icon:SetWidth(24) chip.icon:SetHeight(24) chip.icon:SetPoint("TOP", 0, -6)
+        chip.icon:SetDrawLayer("OVERLAY")
+        chip.icon:SetVertexColor(1, 1, 1, 1)
+        chip.icon:SetAlpha(1)
         chip.label = chip:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         chip.label:SetPoint("BOTTOM", 0, 6) chip.label:SetText(def.label)
+        EvsHL.ConfigUI:StyleText(chip.label)
         if key == "BREAK" then
             chip.icon:SetTexture(FLAT)
             chip.icon:SetVertexColor(def.color[1], def.color[2], def.color[3])
@@ -116,7 +120,11 @@ function EvsHL.BuildAppSorting(page)
             chip.icon:SetTexCoord(0, 1, 0, 1)
         else
             chip.icon:SetTexture(def.texture)
-            chip.icon:SetTexCoord(def.coords[1], def.coords[2], def.coords[3], def.coords[4])
+            if def.coords then
+                chip.icon:SetTexCoord(def.coords[1], def.coords[2], def.coords[3], def.coords[4])
+            else
+                chip.icon:SetTexCoord(0, 1, 0, 1)
+            end
         end
         chip:RegisterForDrag("LeftButton")
         chip:SetScript("OnDragStart", function(self)
@@ -159,7 +167,7 @@ function EvsHL.BuildAppSorting(page)
     H.AddCheck(optionsBox, "Reverse order within roles", 8, -84, "sortReverse", Apply)
 
     local previewBox = H.Section(page, "Preview", -300, 140)
-    H.Note(previewBox, "Sample group, uses the Columns setting from Bars.", 80, -11)
+    H.Tooltip(previewBox.titleButton, "The sample group uses the Columns setting from Bars.")
     local offNote = H.Note(previewBox, "Role sorting is off.", 14, -30)
     local cells = {}
     local legendY = 0

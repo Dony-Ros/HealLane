@@ -3,6 +3,7 @@ local EvsHL = EvsHL
 local function SmartCast_PreClick(self, button, down)
     local S = EvsHL.S
     if not S then return end
+    if EvsHL.IsRoleMenuClick(button) then return end
     local unit = self.unit
     if S.showIncoming and unit and not self.sim then
         EvsHL.pendingClickTarget = { unit = unit, time = GetTime() }

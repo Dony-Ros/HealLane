@@ -51,6 +51,36 @@ EvsHL.SetBlizzardRaidFramesHidden = function()
     Apply(not (EvsHL.S and EvsHL.S.hideBlizzardRaidFrames))
 end
 
+local function HideUnwantedErrorMessages()
+    local frame = UIErrorsFrame
+    local originalOnEvent = frame and frame:GetScript("OnEvent")
+    if not originalOnEvent then return end
+
+    local hiddenMessages = {}
+    for _, message in pairs({
+        energy = ERR_OUT_OF_ENERGY,
+        range = ERR_OUT_OF_RANGE,
+    }) do
+        if type(message) == "string" then
+            hiddenMessages[message] = true
+        end
+    end
+
+    frame:SetScript("OnEvent", function(self, event, ...)
+        if event == "UI_ERROR_MESSAGE" then
+            local errorType, message = ...
+            message = message or errorType
+            if type(message) == "string" and not EvsHL.IsSecretValue(message)
+                and hiddenMessages[message] then
+                return
+            end
+        end
+        return originalOnEvent(self, event, ...)
+    end)
+end
+
+HideUnwantedErrorMessages()
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")

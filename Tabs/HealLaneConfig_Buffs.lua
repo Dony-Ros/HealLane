@@ -13,13 +13,6 @@ function EvsHL.BuildBuffsTab(page)
         return t
     end
 
-    local function TargetLabel(value)
-        for _, o in ipairs(EvsHL.BUFF_TARGETS) do
-            if o[1] == value then return o[2] end
-        end
-        return EvsHL.BUFF_TARGETS[1][2]
-    end
-
     local options = H.Section(page, "Options", -4, 144)
     H.AddButton(options, "Add Buff...", 12, -28, 140, function()
         H.OpenPicker(false, "Add Tracked Buff", function(e)
@@ -42,7 +35,7 @@ function EvsHL.BuildBuffsTab(page)
     H.AddColor(options, "Missing Buff Color", 243, -112, "buffsMissingColor", EvsHL.ApplyVisuals)
 
     local listBox = H.Section(page, "Tracked buffs", -156, 384)
-    H.Note(listBox, "Pick who each buff is tracked on. Pets are always ignored.", 110, -11)
+    H.Tooltip(listBox.titleButton, "Choose which unit types each buff is tracked on. Pets are always ignored.")
     for i = 1, MAXROWS do
         local row = CreateFrame("Frame", nil, listBox)
         row:SetWidth(436)
@@ -54,10 +47,12 @@ function EvsHL.BuildBuffsTab(page)
         row.text:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
         row.text:SetWidth(150)
         row.text:SetJustifyH("LEFT")
-        row.dd = H.AddDropdown(row, 165, 2, 100, EvsHL.BUFF_TARGETS,
+        EvsHL.ConfigUI:StyleText(row.text)
+        row.dd = H.AddDropdown(row, 210, 2, 150, EvsHL.BUFF_TARGETS,
             function() return TargetOf(row.spell) end,
             function(v) if row.spell then S.trackBuffs[row.spell] = v end end)
         row.remove = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        EvsHL.ConfigUI:StyleButton(row.remove)
         row.remove:SetWidth(22) row.remove:SetHeight(20) row.remove:SetPoint("RIGHT", -5, 0) row.remove:SetText("X")
         row.remove:SetScript("OnClick", function()
             S.trackBuffs[row.spell] = nil
@@ -76,8 +71,7 @@ function EvsHL.BuildBuffsTab(page)
                 row.spell = n
                 row.text:SetText(n)
                 row.icon:SetTexture(EvsHL.GetSpellTexture(n))
-                local ddText = _G[row.dd:GetName() .. "Text"]
-                if ddText then ddText:SetText(TargetLabel(TargetOf(n))) end
+                row.dd:SetValue(TargetOf(n))
                 row:Show()
             else
                 row.spell = nil

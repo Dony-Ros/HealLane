@@ -132,6 +132,7 @@ function EvsHL.ClickAction(btn, v, m, b, blank, rank)
     if macro then
         return "macro", nil, macro, nil
     elseif action then
+        if action == "role" then return nil end
         if action ~= "target" or btn.unit ~= "target" then return action end
     elseif v and v ~= "" then
         local spell = rank and (v .. "(" .. rank .. ")") or v
@@ -471,4 +472,5 @@ function EvsHL.Refresh()
     local solo = sim == 0 and not raid and EvsHL.NumParty() == 0
     if S.hideSolo and solo and S.locked then EvsHL.parentFrame:Hide() else EvsHL.parentFrame:Show() end
     EvsHL.ApplyVisuals()
+    if EvsHL.UpdateTargetOutline then EvsHL.UpdateTargetOutline() end
 end

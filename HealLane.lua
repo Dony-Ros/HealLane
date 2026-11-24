@@ -115,7 +115,12 @@ local function Init()
         end
     end
     if old < 9 and S.rangeFallbackAlpha == 0.3 then S.rangeFallbackAlpha = 0.05 end
-    S.ver = 9
+    if old < 10 then
+        S.clicks = type(S.clicks) == "table" and S.clicks or {}
+        if S.clicks["shift-6"] == nil then S.clicks["shift-6"] = "a:role" end
+        if S.clicks["shift-7"] == nil then S.clicks["shift-7"] = "a:role" end
+    end
+    S.ver = 10
     S.healthText = nil
     EvsHL.Merge(S, EvsHL.DEFAULTS)
     for _, key in ipairs({
@@ -155,6 +160,7 @@ function EvsHL.ResetAll()
     if not S then return end
     wipe(S)
     EvsHL.Merge(S, EvsHL.DEFAULTS)
+    S.ver = 10
     EvsHL.ApplyPosition()
     if EvsHL.ApplyBlizzardRaidFrames then EvsHL.ApplyBlizzardRaidFrames(true) end
     EvsHL.Refresh()
@@ -266,6 +272,7 @@ frame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
                 btn.incomingEnd = nil
             end
         end
+        if EvsHL.UpdateTargetOutline then EvsHL.UpdateTargetOutline() end
         if S and not InCombatLockdown() then EvsHL.Refresh() end
     elseif event == "UNIT_HEALTH" or event == "UNIT_HEALTH_FREQUENT"
         or event == "UNIT_MAXHEALTH" or event == "UNIT_FLAGS" or event == "UNIT_CONNECTION"

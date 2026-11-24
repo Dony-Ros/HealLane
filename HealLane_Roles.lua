@@ -125,8 +125,45 @@ function EvsHL.UpdateUnitRoleIcon(btn)
         btn.roleIcon:Hide()
     end
 end
--- Role menu (Shift + mouse wheel) -----------------------------
+-- Configurable role-menu bindings -----------------------------
 local roleMenuFrame = CreateFrame("Frame", "EvsHLRoleMenu", UIParent, "UIDropDownMenuTemplate")
+local roleMenuClickSlots = {
+    LeftButton = 1,
+    RightButton = 2,
+    MiddleButton = 3,
+    Button4 = 4,
+    Button5 = 5,
+}
+function EvsHL.IsRoleMenuBinding(slot)
+    local S = EvsHL.S
+    if not S or not S.clicks then return false end
+    local ctrl = IsControlKeyDown()
+    local alt = IsAltKeyDown()
+    local shift = IsShiftKeyDown()
+    local prefix
+    if ctrl and alt and shift then
+        prefix = "alt-ctrl-shift-"
+    elseif alt and ctrl then
+        prefix = "alt-ctrl-"
+    elseif alt and shift then
+        prefix = "alt-shift-"
+    elseif ctrl and shift then
+        prefix = "ctrl-shift-"
+    elseif alt then
+        prefix = "alt-"
+    elseif ctrl then
+        prefix = "ctrl-"
+    elseif shift then
+        prefix = "shift-"
+    else
+        prefix = ""
+    end
+    return S.clicks[prefix .. slot] == "a:role"
+end
+function EvsHL.IsRoleMenuClick(button)
+    local slot = roleMenuClickSlots[button]
+    return slot and EvsHL.IsRoleMenuBinding(slot) or false
+end
 function EvsHL.ShowRoleMenu(btn)
     local S = EvsHL.S
     local unit = btn.unit

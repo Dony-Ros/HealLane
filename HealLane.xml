@@ -20,12 +20,14 @@
   <!-- Mods -->
   <Script file="Mods/HealLane_ChatRoles.lua" />
   <Script file="Mods/HealLane_NameAlert.lua" />
-  <!-- Config UI (unchanged). -->
+  <!-- Optional HealLaneMod-backed widgets for HealLane's config UI. -->
+  <Script file="HealLane_ConfigUI.lua" />
   <Script file="Tabs/HealLaneConfig_App_General.lua" />
   <Script file="Tabs/HealLaneConfig_App_Healing.lua" />
   <Script file="Tabs/HealLaneConfig_App_Bars.lua" />
   <Script file="Tabs/HealLaneConfig_App_Icons.lua" />
   <Script file="Tabs/HealLaneConfig_App_Sorting.lua" />
+  <Script file="Tabs/HealLaneConfig_Clicks.lua" />
   <Script file="Tabs/HealLaneConfig.lua" />
   <Script file="Tabs/HealLaneConfig_Cure.lua" />
   <Script file="Tabs/HealLaneConfig_Debuffs.lua" />

@@ -7,7 +7,7 @@ The interface is intentionally simpler than addons with extensive skin editors. 
 - Monitor selected buffs and highlight units that are missing them.
 - Show debuffs and configure smart dispels for supported debuff types.
 - Smart Cast can cast a configured resurrection spell when clicking a dead unit, or a configured buff or dispel when appropriate.
-- Display party and raid health frames with configurable layout, health text, role and raid-target icons, range fading, and optional incoming-heal indicators.
+- Display party and raid health frames with configurable layout, health text, role and raid-target icons, range fading, and optional incoming-heal indicators. The Hover outline color also marks the unit matching your current target.
 ## Installation
 1. Copy the `HealLane` folder into your WoW `Interface/AddOns` directory.
 2. Make sure `HealLane.toc` is directly inside that folder.
@@ -16,13 +16,16 @@ This version supports the WoW Forever v1.60.1.70790 interface (`16001`), as well
 ## Getting started
 - Type `/heallane` or `/hl` to open or close the configuration.
 - In **Clicks**, choose a modifier and assign an action to each mouse button. Spell assignments default to max rank; use the adjacent rank menu to choose a specific rank. The optional auto-downrank setting uses the inferred rule that a target can receive a spell rank learned up to 10 levels above their level. It is off by default, only covers spells in the built-in WoW: Forever table, and updates secure click bindings out of combat; unlisted spells keep their configured rank.
+- Use the **Scroll Up** and **Scroll Down** rows in **Clicks** to bind the Role menu to wheel directions and modifiers. Existing Shift+wheel role-menu behavior is preserved by default; wheel rows support the Role menu action only.
 - In **HoTs**, add the spells you want to track.
 - In **Buffs**, add buffs to monitor; missing buffs can be highlighted and handled by Smart Cast.
+- In **General > Font**, choose a font face and adjust text size, outline, shadow, and monochrome rendering for unit names and health values.
 - In **Appearance > General**, set distance fade thresholds outdoors. In instances, WoW does not expose exact unit distances; **Instance out-of-range alpha** (default `0.05`) controls the strong fade for out-of-range or unchecked group units.
 - In **Cure**, add dispel spells and select the debuff types each spell can remove.
 - In **Debuffs**, add spell IDs to ignore; ignored auras do not show an icon or affect the bar color.
 - Configure the resurrection spell in **Clicks**. Smart Cast is enabled by default and can be changed in **General**. The **General** tab has separate options to hide Blizzard's party frames and raid frames; hiding is deferred during combat lockdown.
 - Type `/hlreset` to reset HealLane settings.
+- If HealLaneMod is enabled, HealLane uses its shared dark UI widgets for configuration. HealLaneMod is optional; without it, HealLane uses Blizzard's standard controls. The integration affects only HealLane's configuration window, not its in-game unit frames.
 On clients that provide Blizzard's native `AuraContainer`, HealLane uses the game-managed aura display to show configured HoT icons in application order. The icons reflow as HoTs expire, and their duration text shows whole numbers without unit labels. The health bar changes color for configured dispellable debuffs during combat, for low health, and when the unit has aggro. The **Debuffs** tab can exclude unwanted aura spell IDs from both the icon and bar-color behavior. On clients with native `AuraContainer`, raw aura scans are disabled during combat lockdown. Outside combat, PvE dungeons and raids can be scanned for missing buffs; PvP and arena scans remain disabled to avoid taint errors where the client protects aura data. On clients without `AuraContainer`, scans are disabled in PvP and arena instances, so missing-buff checks and scan-based debuff icons are unavailable there.
 Settings are saved per character.
 ## Project status

@@ -3,13 +3,9 @@ local S
 local frame, picker
 local widgets, pages, tabs = {}, {}, {}
 local seq = 0
-local curMod = ""
 local FLAT = "Interface\\Buttons\\WHITE8x8"
 local function CreateBackdropFrame(frameType, name, parent, template)
-    if BackdropTemplateMixin then
-        template = template and template ~= "" and (template .. ", BackdropTemplate") or "BackdropTemplate"
-    end
-    return CreateFrame(frameType, name, parent, template)
+    return EvsHL.ConfigUI:CreateBackdropFrame(frameType, name, parent, template)
 end
 function EvsHL.AddConfigWidget(fn) table.insert(widgets, fn) end
 local function Name() seq = seq + 1 return "EvsHLCfg" .. seq end
@@ -23,38 +19,34 @@ function EvsHL.SyncConfig()
 end
 local function AddCheck(parent, text, x, y, key, after)
     local name = Name()
-    local cb = CreateFrame("CheckButton", name, parent, "UICheckButtonTemplate")
+    local cb = EvsHL.ConfigUI:CreateCheckbox(parent, name, text, S[key], function(value)
+        S[key] = value
+        after()
+    end)
     cb:SetPoint("TOPLEFT", x, y)
-    _G[name .. "Text"]:SetText(text)
-    cb:SetScript("OnClick", function(self) S[key] = self:GetChecked() and true or false after() end)
+    EvsHL.ConfigUI:StyleCheckbox(cb)
     widgets[#widgets + 1] = function() cb:SetChecked(S[key]) end
+    return cb
 end
 local function AddSlider(parent, text, x, y, key, lo, hi, step, after)
     local name = Name()
-    local s = CreateFrame("Slider", name, parent, "OptionsSliderTemplate")
-    s:SetPoint("TOPLEFT", x, y)
-    s:SetWidth(180)
-    s:SetMinMaxValues(lo, hi)
-    s:SetValueStep(step)
-    _G[name .. "Low"]:SetText(lo)
-    _G[name .. "High"]:SetText(hi)
-    local label = _G[name .. "Text"]
-    s:SetScript("OnValueChanged", function(self, v)
+    local s
+    s = EvsHL.ConfigUI:CreateSlider(parent, name, text, 180, lo, hi, step, S[key], function(v)
         v = tonumber(string.format("%.2f", math.floor(v / step + 0.5) * step))
-        label:SetText(text .. ": " .. v)
-        if self.loading then return end
+        if s.loading then return end
         if S[key] ~= v then S[key] = v after() end
     end)
+    s:SetPoint("TOPLEFT", x, y)
     widgets[#widgets + 1] = function()
         s.loading = true
         s:SetValue(S[key])
-        label:SetText(text .. ": " .. S[key])
         s.loading = false
     end
+    return s
 end
 local function AddButton(parent, text, x, y, w, onClick, anchorPoint, relativePoint, offsetX, offsetY)
-    local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    b:SetWidth(w) b:SetHeight(24) b:SetText(text) b:SetScript("OnClick", onClick)
+    local b = EvsHL.ConfigUI:CreateButton(parent, text, w, 24, onClick)
+    EvsHL.ConfigUI:StyleButton(b)
     if anchorPoint then
         b:SetPoint(anchorPoint, offsetX or 0, offsetY or 0)
     else
@@ -63,14 +55,17 @@ local function AddButton(parent, text, x, y, w, onClick, anchorPoint, relativePo
     return b
 end
 local function AddColor(parent, text, x, y, key, after)
-    local sw = CreateFrame("Button", nil, parent)
+    local sw = EvsHL.ConfigUI:CreateButton(parent, "", 24, 24)
     sw:SetWidth(24) sw:SetHeight(24) sw:SetPoint("TOPLEFT", x, y)
+    EvsHL.ConfigUI:StyleButton(sw)
     local border = sw:CreateTexture(nil, "BACKGROUND")
     border:SetPoint("TOPLEFT", -2, 2) border:SetPoint("BOTTOMRIGHT", 2, -2) EvsHL.SetTextureColor(border, 0.6, 0.6, 0.6)
     local tex = sw:CreateTexture(nil, "ARTWORK")
+    tex:SetDrawLayer("OVERLAY")
     tex:SetAllPoints() EvsHL.SetTextureColor(tex, 1, 1, 1)
     local label = sw:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     label:SetPoint("LEFT", sw, "RIGHT", 10, 0) label:SetText(text)
+    EvsHL.ConfigUI:StyleText(label)
     local function paint() tex:SetVertexColor(S[key][1], S[key][2], S[key][3]) end
     sw:SetScript("OnClick", function()
         local c = S[key]
@@ -107,58 +102,18 @@ local function AddColor(parent, text, x, y, key, after)
 end
 local function AddDropdown(parent, x, y, width, options, get, set)
     local name = Name()
-    local dd = CreateFrame("Frame", name, parent, "UIDropDownMenuTemplate")
-    dd:SetPoint("TOPLEFT", x, y)
-    if not pcall(UIDropDownMenu_SetWidth, width, dd) then pcall(UIDropDownMenu_SetWidth, dd, width) end
-    local text = _G[name .. "Text"]
-    local function Show()
-        local cur = get()
-        for _, o in ipairs(options) do if o[1] == cur then text:SetText(o[2]) end end
+    local uiOptions = {}
+    for _, option in ipairs(options) do
+        uiOptions[#uiOptions + 1] = { value = option[1], label = option[2] }
     end
-    UIDropDownMenu_Initialize(dd, function()
-        for _, o in ipairs(options) do
-            local info = { text = o[2], checked = (get() == o[1]), func = function() set(o[1]) Show() end }
-            UIDropDownMenu_AddButton(info)
-        end
+    local dd = EvsHL.ConfigUI:CreateDropdown(parent, name, width, uiOptions, get(), function(value)
+        set(value)
     end)
-    widgets[#widgets + 1] = Show
+    dd:SetPoint("TOPLEFT", x, y)
+    widgets[#widgets + 1] = function() dd:SetValue(get()) end
     return dd
 end
 local function Trim(s) return (s or ""):gsub("^%s+", ""):gsub("%s+$", "") end
-local function Macros()
-    local list = {}
-    local max = (MAX_ACCOUNT_MACROS or 36) + (MAX_CHARACTER_MACROS or 18)
-    for i = 1, max do
-        local name, icon = GetMacroInfo(i)
-        if name then
-            if type(icon) == "string" and not icon:find("\\") then icon = "Interface\\Icons\\" .. icon end
-            list[#list + 1] = { name = name, icon = icon, kind = "macro" }
-        end
-    end
-    table.sort(list, function(a, b) return a.name < b.name end)
-    return list
-end
-local ACTIONS = {
-    { name = "Target", action = "target", icon = "Interface\\Icons\\Ability_Marksmanship" },
-    { name = "Menu", action = "menu", icon = "Interface\\Icons\\INV_Misc_Note_01" },
-    { name = "Focus", action = "focus", icon = "Interface\\Icons\\Ability_TrueShot" },
-    { name = "Assist", action = "assist", icon = "Interface\\Icons\\Ability_Hunter_SniperShot" },
-}
-local TAGS = { macro = " |cff9999ff(macro)|r", action = " |cff99ff99(action)|r" }
-local function Describe(value)
-    if not value or value == "" then return nil end
-    local macro = value:match("^m:(.+)")
-    if macro then
-        for _, m in ipairs(Macros()) do if m.name == macro then return m.icon, macro, "macro" end end
-        return nil, macro, "macro"
-    end
-    local action = value:match("^a:(.+)")
-    if action then
-        for _, a in ipairs(ACTIONS) do if a.action == action then return a.icon, a.name, "action" end end
-        return nil, action, "action"
-    end
-    return EvsHL.GetSpellTexture(value), value
-end
 local ROWS, ROW_H = 16, 24 -- Increased visible rows for bigger window
 local function BuildPicker()
     picker = CreateBackdropFrame("Frame", "EvsHLPicker", UIParent)
@@ -170,19 +125,26 @@ local function BuildPicker()
         edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
         tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 }
     })
+    EvsHL.ConfigUI:StylePanel(picker, EvsHL.ConfigUI:GetColors().bg)
     picker:Hide()
     tinsert(UISpecialFrames, "EvsHLPicker")
     picker.title = picker:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     picker.title:SetPoint("TOP", 0, -16)
+    EvsHL.ConfigUI:StyleText(picker.title)
     local close = CreateFrame("Button", nil, picker, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -6, -6)
     local searchLabel = picker:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     searchLabel:SetPoint("TOPLEFT", 22, -44) searchLabel:SetText("Search")
+    EvsHL.ConfigUI:StyleText(searchLabel)
     local search = CreateFrame("EditBox", Name(), picker, "InputBoxTemplate")
+    EvsHL.ConfigUI:StyleEditBox(search)
     search:SetAutoFocus(false) search:SetWidth(190) search:SetHeight(20) search:SetMaxLetters(40) search:SetPoint("TOPLEFT", 78, -40)
     local allName = Name()
-    local all = CreateFrame("CheckButton", allName, picker, "UICheckButtonTemplate")
-    all:SetPoint("TOPLEFT", 18, -62) _G[allName .. "Text"]:SetText("Show all spells")
+    local all = EvsHL.ConfigUI:CreateCheckbox(picker, allName, "Show all spells", false, function()
+        picker.Refilter()
+    end)
+    all:SetPoint("TOPLEFT", 18, -62)
+    EvsHL.ConfigUI:StyleCheckbox(all)
     picker.allCheckbox = all
     local scrollName = Name()
     local scroll = CreateFrame("ScrollFrame", scrollName, picker, "FauxScrollFrameTemplate")
@@ -194,7 +156,7 @@ local function BuildPicker()
         for i = 1, ROWS do
             local row, e = rows[i], filtered[offset + i]
             if e then
-                row.entry = e row.icon:SetTexture(e.icon) row.text:SetText(e.name .. (TAGS[e.kind] or "")) row:Show()
+                row.entry = e row.icon:SetTexture(e.icon) row.text:SetText(e.name .. (EvsHL.CLICK_TAGS[e.kind] or "")) row:Show()
             else row.entry = nil row:Hide() end
         end
     end
@@ -202,7 +164,9 @@ local function BuildPicker()
         local q = Trim(search:GetText()):lower()
         wipe(filtered)
         for _, e in ipairs(picker.entries or {}) do
-            if (e.kind ~= "spell" or all:GetChecked() or e.helpful) and (q == "" or e.name:lower():find(q, 1, true)) then
+            if (not picker.roleMenuOnly or (e.kind == "action" and e.action == "role"))
+                and (e.kind ~= "spell" or all:GetChecked() or e.helpful)
+                and (q == "" or e.name:lower():find(q, 1, true)) then
                 filtered[#filtered + 1] = e
             end
         end
@@ -220,6 +184,7 @@ local function BuildPicker()
         row:SetHighlightTexture(FLAT) row:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.15)
         row.icon = row:CreateTexture(nil, "ARTWORK") row.icon:SetWidth(20) row.icon:SetHeight(20) row.icon:SetPoint("LEFT", 2, 0)
         row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight") row.text:SetPoint("LEFT", row.icon, "RIGHT", 8, 0) row.text:SetPoint("RIGHT", -4, 0) row.text:SetJustifyH("LEFT")
+        EvsHL.ConfigUI:StyleText(row.text)
         row:SetScript("OnEnter", function(self)
             local entry = self.entry
             if entry and entry.kind == "spell" and entry.index then
@@ -242,20 +207,24 @@ local function BuildPicker()
     end
     picker.search = search
 end
-local function OpenPicker(withMacros, title, callback, showAllSpells)
+local function OpenPicker(withMacros, title, callback, showAllSpells, roleMenuOnly)
     if not picker then BuildPicker() end
     EvsHL.ScanSpells()
     local entries = {}
     for _, e in ipairs(EvsHL.spells or {}) do entries[#entries + 1] = e end
     if withMacros then
-        for _, m in ipairs(Macros()) do entries[#entries + 1] = m end
-        for _, a in ipairs(ACTIONS) do entries[#entries + 1] = { name = a.name, icon = a.icon, kind = "action", action = a.action } end
+        for _, macro in ipairs(EvsHL.GetClickMacros()) do entries[#entries + 1] = macro end
+        for _, action in ipairs(EvsHL.CLICK_ACTIONS) do
+            entries[#entries + 1] = { name = action.name, icon = action.icon, kind = "action", action = action.action }
+        end
     end
     picker.entries = entries
     picker.callback = callback
+    picker.roleMenuOnly = roleMenuOnly and true or false
     picker.title:SetText(title)
     picker.search:SetText("")
     picker.allCheckbox:SetChecked(showAllSpells and true or false)
+    if picker.roleMenuOnly then picker.allCheckbox:Hide() else picker.allCheckbox:Show() end
     picker:ClearAllPoints()
     picker:SetPoint("TOPLEFT", frame, "TOPRIGHT", -4, 0)
     picker:Show()
@@ -265,12 +234,17 @@ end
 local function Label(page, text, x, y)
     local fs = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     fs:SetPoint("TOPLEFT", x, y) fs:SetText(text)
+    EvsHL.ConfigUI:StyleText(fs)
     return fs
 end
 local function Note(parent, text, x, y)
     local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     fs:SetPoint("TOPLEFT", x, y) fs:SetText(text) fs:SetTextColor(0.7, 0.7, 0.7)
+    EvsHL.ConfigUI:StyleText(fs, EvsHL.ConfigUI:GetColors().muted)
     return fs
+end
+local function Tooltip(element, text)
+    EvsHL.ConfigUI:SetTooltip(element, text)
 end
 local function Field(parent, text, x, y, width, options, get, set)
     Label(parent, text, x, y)
@@ -282,14 +256,21 @@ local function Section(page, title, y, h, x, w)
     c:SetBackdrop({ bgFile = FLAT, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
     c:SetBackdropColor(0, 0, 0, 0.35)
     c:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
-    local fs = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    fs:SetPoint("TOPLEFT", 12, -8) fs:SetText(title)
+    EvsHL.ConfigUI:StylePanel(c, EvsHL.ConfigUI:GetColors().panel)
+    local titleButton = CreateFrame("Button", nil, c)
+    titleButton:SetPoint("TOPLEFT", 12, -2)
+    titleButton:SetSize(math.max((w or 460) - 24, 1), 20)
+    local fs = titleButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("LEFT")
+    fs:SetText(title)
+    EvsHL.ConfigUI:StyleText(fs)
+    c.titleButton = titleButton
     return c
 end
 -- Expose to the other config files
-EvsHL.ConfigHelpers = { Backdrop = CreateBackdropFrame, AddCheck = AddCheck, AddSlider = AddSlider, AddButton = AddButton, AddColor = AddColor, AddDropdown = AddDropdown, OpenPicker = OpenPicker, Label = Label, Note = Note, Field = Field, Section = Section }
+EvsHL.ConfigHelpers = { Backdrop = CreateBackdropFrame, Name = Name, AddCheck = AddCheck, AddSlider = AddSlider, AddButton = AddButton, AddColor = AddColor, AddDropdown = AddDropdown, OpenPicker = OpenPicker, Label = Label, Note = Note, Tooltip = Tooltip, Field = Field, Section = Section }
 -- GENERAL TAB
-local function BuildGeneral(page)
+local function BuildGeneralOptions(page)
     local H = EvsHL.ConfigHelpers
     local L, R = 8, 235
 
@@ -322,159 +303,65 @@ local function BuildGeneral(page)
     H.AddButton(page, "Reset position", 0, 0, 140, function() EvsHL.ResetPosition() end, "BOTTOMLEFT", nil, 15, 15)
     H.AddButton(page, "Reset all settings", 0, 0, 160, function() EvsHL.ResetAll() Sync() end, "BOTTOMRIGHT", nil, -15, 15)
 end
-local function BuildClicks(page)
+local function BuildGeneralFont(page)
     local H = EvsHL.ConfigHelpers
-    local modOptions = {
-        { "", "None" }, { "shift-", "Shift" }, { "ctrl-", "Ctrl" }, { "alt-", "Alt" },
-        { "ctrl-shift-", "Ctrl + Shift" }, { "alt-shift-", "Alt + Shift" },
-        { "alt-ctrl-", "Alt + Ctrl" }, { "alt-ctrl-shift-", "Alt + Ctrl + Shift" },
-    }
-    local btnLabels = { "Left", "Right", "Middle", "Button 4", "Button 5" }
-    local slots = {}
-    local function Load()
-        for i, slot in ipairs(slots) do
-            local value = S.clicks[curMod .. i]
-            local icon, text, tag = Describe(value)
-            if text then
-                slot.icon:SetTexture(icon) slot.text:SetText(text .. (TAGS[tag] or "")) slot.text:SetTextColor(1, 1, 1) slot.clear:Show()
-            else
-                slot.icon:SetTexture(nil) slot.text:SetText(i == 1 and "Target (default)" or i == 2 and "Menu (default)" or "Click to choose...") slot.text:SetTextColor(0.55, 0.55, 0.55) slot.clear:Hide()
-            end
-            if text and not tag then
-                slot.rankDropdown:Show()
-                slot.rankText()
-            else
-                slot.rankDropdown:Hide()
-            end
-        end
-    end
-    H.Label(page, "Modifier", 25, -16)
-    H.AddDropdown(page, 85, -8, 150, modOptions, function() return curMod end, function(v) curMod = v Load() end)
-    for i, text in ipairs(btnLabels) do
-        local index = i
-        local y = -52 - (i - 1) * 42
-        H.Label(page, text, 25, y - 7)
-        local slot = CreateBackdropFrame("Button", nil, page)
-        slot:SetWidth(150) slot:SetHeight(28) slot:SetPoint("TOPLEFT", 110, y)
-        slot:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-        slot:SetBackdropColor(0, 0, 0, 0.6)
-        slot:SetHighlightTexture(FLAT) slot:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.12)
-        slot.icon = slot:CreateTexture(nil, "ARTWORK") slot.icon:SetWidth(20) slot.icon:SetHeight(20) slot.icon:SetPoint("LEFT", 5, 0)
-        slot.text = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlight") slot.text:SetPoint("LEFT", slot.icon, "RIGHT", 8, 0) slot.text:SetPoint("RIGHT", -6, 0) slot.text:SetJustifyH("LEFT")
-        slot.rankDropdown = CreateFrame("Frame", Name(), page, "UIDropDownMenuTemplate")
-        slot.rankDropdown:SetPoint("LEFT", slot, "RIGHT", -8, 0)
-        if not pcall(UIDropDownMenu_SetWidth, 100, slot.rankDropdown) then
-            pcall(UIDropDownMenu_SetWidth, slot.rankDropdown, 100)
-        end
-        local function RankOptions()
-            local options = { { value = "__max", text = "Max rank" } }
-            local slotKey = curMod .. index
-            local chosen = S.clicks[slotKey]
-            local _, _, tag = Describe(chosen)
-            if chosen and not tag then
-                for _, entry in ipairs(EvsHL.spells or {}) do
-                    if entry.name == chosen then
-                        for _, rank in ipairs(entry.ranks or {}) do
-                            options[#options + 1] = { value = rank, text = rank }
-                        end
-                        break
-                    end
-                end
-                local selectedRank = S.clickRanks and S.clickRanks[slotKey]
-                local found = false
-                for _, option in ipairs(options) do
-                    if option.value == selectedRank then found = true break end
-                end
-                if selectedRank and not found then
-                    options[#options + 1] = { value = selectedRank, text = selectedRank }
-                end
-            end
-            return options
-        end
-        UIDropDownMenu_Initialize(slot.rankDropdown, function()
-            local slotKey = curMod .. index
-            for _, option in ipairs(RankOptions()) do
-                local value, label = option.value, option.text
-                UIDropDownMenu_AddButton({
-                    text = label,
-                    checked = (S.clickRanks and S.clickRanks[slotKey] or "__max") == value,
-                    func = function()
-                        S.clickRanks = S.clickRanks or {}
-                        if value == "__max" then
-                            S.clickRanks[slotKey] = nil
-                        else
-                            S.clickRanks[slotKey] = value
-                        end
-                        Load()
-                        EvsHL.Refresh()
-                    end,
-                })
-            end
-        end)
-        slot:SetScript("OnClick", function()
-            H.OpenPicker(true, btnLabels[i] .. " click", function(e)
-                local slotKey = curMod .. index
-                S.clicks[slotKey] = e.kind == "macro" and ("m:" .. e.name) or e.kind == "action" and ("a:" .. e.action) or e.name
-                S.clickRanks = S.clickRanks or {}
-                S.clickRanks[slotKey] = nil
-                EvsHL.Refresh() Load()
-            end)
-        end)
-        slot.clear = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-        slot.clear:SetWidth(24) slot.clear:SetHeight(24) slot.clear:SetPoint("LEFT", slot.rankDropdown, "RIGHT", -8, 0) slot.clear:SetText("X")
-        slot.clear:SetScript("OnClick", function()
-            local slotKey = curMod .. index
-            S.clicks[slotKey] = nil
-            if S.clickRanks then S.clickRanks[slotKey] = nil end
-            EvsHL.Refresh()
-            Load()
-        end)
-        slot.rankDropdown:Hide()
-        slot.rankText = function()
-            local slotKey = curMod .. index
-            local rank = S.clickRanks and S.clickRanks[slotKey]
-            local selectedText = "Max rank"
-            for _, option in ipairs(RankOptions()) do
-                if option.value == rank then selectedText = option.text break end
-            end
-            UIDropDownMenu_SetText(slot.rankDropdown, selectedText)
-        end
-        slots[i] = slot
-    end
-    AddCheck(page, "Auto-downgrade ranks for low-level units", 25, -252, "autoDownrank", Layout)
-    H.Label(page, "Uses spellbook levels or built-in rank levels.", 25, -280)
-    H.Label(page, "Also applies to tracked buffs cast by Smart Cast.", 25, -296)
-    H.Label(page, "Smart Cast Resurrection Spell", 25, -324)
-    H.Label(page, "Cast automatically when clicking a dead unit.", 25, -340)
-    local resBtn = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-    resBtn:SetWidth(260)
-    resBtn:SetHeight(24)
-    resBtn:SetPoint("TOPLEFT", 25, -359)
-    local resIcon = resBtn:CreateTexture(nil, "ARTWORK")
-    resIcon:SetWidth(18)
-    resIcon:SetHeight(18)
-    resIcon:SetPoint("LEFT", 5, 0)
-    local resText = resBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    resText:SetPoint("LEFT", resIcon, "RIGHT", 8, 0)
-    local function UpdateResBtn()
-        local val = S.resSpell
-        if val and val ~= "" then
-            resIcon:SetTexture(EvsHL.GetSpellTexture(val))
-            resText:SetText(val)
-        else
-            resIcon:SetTexture(nil)
-            resText:SetText("Click to pick a resurrection spell...")
-        end
-    end
-    UpdateResBtn()
-    resBtn:SetScript("OnClick", function()
-        H.OpenPicker(false, "Pick Resurrection Spell", function(e)
-            S.resSpell = e.name
-            UpdateResBtn()
-        end)
+    local textBox = Section(page, "Unit frame text", -4, 210)
+    H.Label(textBox, "Font", 20, -38)
+    H.AddDropdown(textBox, 54, -30, 165, {
+        { "Fonts\\FRIZQT__.TTF", "Friz Quadrata" },
+        { "Fonts\\ARIALN.TTF", "Arial Narrow" },
+        { "Fonts\\MORPHEUS.TTF", "Morpheus" },
+        { "Fonts\\SKURRI.TTF", "Skurri" },
+    }, function() return S.fontFace or EvsHL.DEFAULTS.fontFace end, function(value)
+        S.fontFace = value
+        EvsHL.ApplyVisuals()
     end)
-    widgets[#widgets + 1] = UpdateResBtn
-    widgets[#widgets + 1] = Load
+    H.Label(textBox, "Outline", 250, -38)
+    H.AddDropdown(textBox, 294, -30, 145, {
+        { "", "None" },
+        { "OUTLINE", "Outline" },
+        { "THICKOUTLINE", "Thick outline" },
+    }, function() return S.fontOutline or EvsHL.DEFAULTS.fontOutline end, function(value)
+        S.fontOutline = value
+        EvsHL.ApplyVisuals()
+    end)
+    H.AddSlider(textBox, "Name and health text size", 20, -86, "fontSize", 6, 16, 1, EvsHL.ApplyVisuals)
+    H.AddCheck(textBox, "Text shadow", 250, -90, "fontShadow", EvsHL.ApplyVisuals)
+    H.AddCheck(textBox, "Monochrome", 250, -118, "fontMonochrome", EvsHL.ApplyVisuals)
+    H.Tooltip(textBox.titleButton, "WoW supports font faces, outlines, shadows, and monochrome; bold/italic styles aren't exposed.")
+end
+local function BuildGeneral(page)
+    local labels = { "Options", "Font" }
+    local builders = { BuildGeneralOptions, BuildGeneralFont }
+    local pages, tabs = {}, {}
+
+    local function Select(index)
+        for i, subPage in ipairs(pages) do
+            if i == index then
+                subPage:Show()
+            else
+                subPage:Hide()
+            end
+            EvsHL.ConfigUI:SetTabSelected(tabs[i], i == index)
+        end
+    end
+
+    for i, build in ipairs(builders) do
+        local index = i
+        local tab = EvsHL.ConfigUI:CreateTabButton(page, labels[i], 76, 22, function()
+            Select(index)
+        end)
+        tab:SetPoint("TOPLEFT", 20 + (i - 1) * 78, -5)
+        tabs[i] = tab
+
+        local subPage = CreateFrame("Frame", nil, page)
+        subPage:SetPoint("TOPLEFT", 0, -30)
+        subPage:SetPoint("BOTTOMRIGHT")
+        subPage:Hide()
+        pages[i] = subPage
+        build(subPage)
+    end
+    Select(1)
 end
 local function BuildHots(page)
     local H = EvsHL.ConfigHelpers
@@ -493,6 +380,7 @@ local function BuildHots(page)
         end)
     end)
     local spellInput = CreateFrame("EditBox", Name(), page, "InputBoxTemplate")
+    EvsHL.ConfigUI:StyleEditBox(spellInput)
     spellInput:SetAutoFocus(false)
     spellInput:SetWidth(125)
     spellInput:SetHeight(20)
@@ -526,7 +414,9 @@ local function BuildHots(page)
         row:SetWidth(370) row:SetHeight(20) row:SetPoint("TOPLEFT", 25, -42 - (i - 1) * 22)
         row.icon = row:CreateTexture(nil, "ARTWORK") row.icon:SetWidth(18) row.icon:SetHeight(18) row.icon:SetPoint("LEFT", 0, 0)
         row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight") row.text:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
+        EvsHL.ConfigUI:StyleText(row.text)
         row.remove = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        EvsHL.ConfigUI:StyleButton(row.remove)
         row.remove:SetWidth(22) row.remove:SetHeight(20) row.remove:SetPoint("RIGHT", -5, 0) row.remove:SetText("X")
         row.remove:SetScript("OnClick", function()
             S.hots[row.spell] = nil
@@ -551,7 +441,12 @@ end
 local subPages, subTabs = {}, {}
 local function SelectSub(index)
     for i, p in ipairs(subPages) do
-        if i == index then p:Show() subTabs[i]:Disable() else p:Hide() subTabs[i]:Enable() end
+        if i == index then
+            p:Show()
+        else
+            p:Hide()
+        end
+        EvsHL.ConfigUI:SetTabSelected(subTabs[i], i == index)
     end
 end
 local function BuildAppearanceParent(page)
@@ -564,24 +459,29 @@ local function BuildAppearanceParent(page)
     }
     local subLabels = { "General", "Healing", "Bars", "Icons", "Sorting" }
     for i, build in ipairs(subBuilders) do
-        local tab = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-        tab:SetWidth(74) tab:SetHeight(22)
+        local index = i
+        local tab = EvsHL.ConfigUI:CreateTabButton(page, subLabels[i], 74, 22, function()
+            SelectSub(index)
+        end)
         tab:SetPoint("TOPLEFT", 20 + (i - 1) * 76, -5)
-        tab:SetText(subLabels[i])
-        tab:SetScript("OnClick", function() SelectSub(i) end)
-        subTabs[i] = tab
+        subTabs[index] = tab
         local subPage = CreateFrame("Frame", nil, page)
         subPage:SetPoint("TOPLEFT", 0, -30)
         subPage:SetPoint("BOTTOMRIGHT", 0, 0)
         subPage:Hide()
-        subPages[i] = subPage
+        subPages[index] = subPage
         build(subPage)
     end
     SelectSub(1)
 end
 local function Select(index)
     for i, p in ipairs(pages) do
-        if i == index then p:Show() tabs[i]:Disable() else p:Hide() tabs[i]:Enable() end
+        if i == index then
+            p:Show()
+        else
+            p:Hide()
+        end
+        EvsHL.ConfigUI:SetTabSelected(tabs[i], i == index)
     end
 end
 local function Build()
@@ -596,28 +496,30 @@ local function Build()
         edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
         tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 }
     })
+    EvsHL.ConfigUI:StylePanel(frame, EvsHL.ConfigUI:GetColors().bg)
     frame:Hide()
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -16) title:SetText("HealLane")
+    EvsHL.ConfigUI:StyleText(title)
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -6, -6)
     tinsert(UISpecialFrames, "EvsHLConfigFrame")
     -- Main Tabs
-    local builders = { BuildGeneral, BuildAppearanceParent, BuildClicks, BuildHots, EvsHL.BuildCureTab, EvsHL.BuildDebuffsTab, EvsHL.BuildBuffsTab, EvsHL.BuildModsTab }
+    local builders = { BuildGeneral, BuildAppearanceParent, EvsHL.BuildClicksTab, BuildHots, EvsHL.BuildCureTab, EvsHL.BuildDebuffsTab, EvsHL.BuildBuffsTab, EvsHL.BuildModsTab }
     local labels = { "General", "Appearance", "Clicks", "HoTs", "Cure", "Debuffs", "Buffs", "Mods" }
     local TABS_PER_ROW = 7
     for i, build in ipairs(builders) do
-        local tab = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-        tab:SetWidth(64) tab:SetHeight(24)
+        local index = i
+        local tab = EvsHL.ConfigUI:CreateTabButton(frame, labels[i], 64, 24, function()
+            Select(index)
+        end)
         local tabRow = math.floor((i - 1) / TABS_PER_ROW)
         local tabCol = (i - 1) % TABS_PER_ROW
         tab:SetPoint("TOPLEFT", 22 + tabCol * 66, -44 - tabRow * 26)
-        tab:SetText(labels[i])
-        tab:SetScript("OnClick", function() Select(i) end)
-        tabs[i] = tab
+        tabs[index] = tab
         local page = CreateFrame("Frame", nil, frame)
         page:SetPoint("TOPLEFT", 10, -102) page:SetPoint("BOTTOMRIGHT", -10, 12) page:Hide()
-        pages[i] = page
+        pages[index] = page
         build(page)
     end
     frame:SetScript("OnShow", Sync)
@@ -645,6 +547,7 @@ end
 local panel = CreateFrame("Frame", "EvsHLOptionsPanel", UIParent)
 panel.name = "HealLane"
 local open = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+EvsHL.ConfigUI:StyleButton(open)
 open:SetWidth(160) open:SetHeight(24) open:SetPoint("TOPLEFT", 20, -20) open:SetText("Open settings")
 open:SetScript("OnClick", function() EvsHL.ToggleConfig() end)
 if Settings and Settings.RegisterCanvasLayoutCategory then

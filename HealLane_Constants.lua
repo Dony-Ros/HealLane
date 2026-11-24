@@ -55,6 +55,11 @@ EvsHL.DEFAULTS = {
     lowHealthColor = true,
     classColor = true,
     hpMode = "none",
+    fontSize = 10,
+    fontFace = "Fonts\\FRIZQT__.TTF",
+    fontOutline = "OUTLINE",
+    fontMonochrome = false,
+    fontShadow = false,
     showBorder = false,
     showTooltip = false,
     hoverColor = { 1, 1, 1 },
@@ -101,7 +106,7 @@ EvsHL.DEFAULTS = {
     debuffMagicColor = { 0.65, 0.65, 0.65 },
     debuffBleedColor = { 0.9, 0.1, 0.1 },
     smartCast = true,
-    clicks = {},
+    clicks = { ["shift-6"] = "a:role", ["shift-7"] = "a:role" },
     clickRanks = {},
     autoDownrank = false,
     hots = {},
@@ -208,8 +213,27 @@ function EvsHL.BuffRemaining(duration, expires)
 end
 
 -- True when the buff is absent, or present but inside the expiry warning window.
+local wildBuffEquivalents
+local function GetWildBuffEquivalent(name)
+    if not wildBuffEquivalents and EvsHL.GetSpellInfo then
+        local markName = EvsHL.GetSpellInfo(1126)
+        local giftName = EvsHL.GetSpellInfo(21849)
+        if type(markName) == "string" and type(giftName) == "string" then
+            wildBuffEquivalents = {
+                [markName] = giftName,
+                [giftName] = markName,
+            }
+        end
+    end
+    return wildBuffEquivalents and wildBuffEquivalents[name]
+end
+
 function EvsHL.BuffLacking(buffs, name)
     local remaining = buffs[name]
+    if not remaining then
+        local equivalent = GetWildBuffEquivalent(name)
+        remaining = equivalent and buffs[equivalent]
+    end
     if not remaining then return true end
     local warn = EvsHL.S and EvsHL.S.buffExpireWarn or 0
     return warn > 0 and remaining <= warn

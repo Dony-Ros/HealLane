@@ -101,6 +101,15 @@ local function LayoutResourceBar(btn, S)
     bar:SetHeight(S.resourceBarHeight or 4)
     bar:SetPoint(anchor, btn, anchor, S.resourceBarOffsetX or 0, S.resourceBarOffsetY or 2)
 end
+local function ApplyTextFont(fontString, font, size, flags, shadow)
+    fontString:SetFont(font, size, flags)
+    fontString:SetShadowColor(0, 0, 0, shadow and 1 or 0)
+    if shadow then
+        fontString:SetShadowOffset(1, -1)
+    else
+        fontString:SetShadowOffset(0, 0)
+    end
+end
 function EvsHL.ApplyVisuals()
     local S = EvsHL.S
     if not S then
@@ -162,7 +171,16 @@ function EvsHL.ApplyVisuals()
     if not S.showIncoming then
         EvsHL.pendingCast = nil
     end
+    local fontSize = tonumber(S.fontSize) or EvsHL.DEFAULTS.fontSize
+    local font = S.fontFace or EvsHL.DEFAULTS.fontFace
+    local fontFlags = S.fontOutline or EvsHL.DEFAULTS.fontOutline
+    if S.fontMonochrome then
+        fontFlags = fontFlags ~= "" and (fontFlags .. ",MONOCHROME") or "MONOCHROME"
+    end
+    if fontFlags == "" then fontFlags = nil end
     for _, btn in pairs(EvsHL.buttons) do
+        ApplyTextFont(btn.font, font, fontSize, fontFlags, S.fontShadow)
+        ApplyTextFont(btn.hpText, font, fontSize, fontFlags, S.fontShadow)
         if not S.showIncoming then
             btn.incoming = nil
             btn.incomingSpell = nil
@@ -242,13 +260,32 @@ EvsHL.ShowUnitMenu = ShowUnitMenu
 -- ============================================================
 -- Unit button creation
 -- ============================================================
+local function UpdateTargetOutline(btn)
+    if not btn or not btn.hover then return end
+    local S = EvsHL.S
+    local color = S and S.hoverColor or { 1, 1, 1 }
+    btn.hover:SetBackdropBorderColor(color[1], color[2], color[3], 1)
+    local isTarget = not btn.sim and btn.unit and UnitExists("target")
+        and UnitIsUnit(btn.unit, "target")
+    if btn.mouseHovered or isTarget then
+        btn.hover:Show()
+    else
+        btn.hover:Hide()
+    end
+end
+EvsHL.UpdateTargetOutline = function()
+    for _, btn in pairs(EvsHL.buttons) do
+        UpdateTargetOutline(btn)
+    end
+end
 function EvsHL.CreateUnitButton(index)
     local btn = CreateFrame("Button", "PartyHealButton" .. index, parentFrame, "HealLaneUnitButtonTemplate")
     btn:SetAttribute("useOnKeyDown", false)
     btn:RegisterForClicks("AnyUp")
     btn:EnableMouseWheel(true)
-    btn:SetScript("OnMouseWheel", function(self)
-        if IsShiftKeyDown() then
+    btn:SetScript("OnMouseWheel", function(self, delta)
+        local slot = delta > 0 and 6 or delta < 0 and 7
+        if slot and EvsHL.IsRoleMenuBinding(slot) then
             EvsHL.ShowRoleMenu(self)
         end
     end)
@@ -257,6 +294,11 @@ function EvsHL.CreateUnitButton(index)
     -- Hook Secure Action Click for Smart Casting
     btn:HookScript("PreClick", EvsHL.SmartCast_PreClick)
     btn:HookScript("PostClick", EvsHL.SmartCast_PostClick)
+    btn:HookScript("PostClick", function(self, button)
+        if EvsHL.IsRoleMenuClick(button) then
+            EvsHL.ShowRoleMenu(self)
+        end
+    end)
     local predClip = CreateFrame("Frame", nil, btn)
     predClip:SetAllPoints(btn.healthBar)
     predClip:SetFrameLevel(btn.healthBar:GetFrameLevel() + 1)
@@ -363,16 +405,16 @@ function EvsHL.CreateUnitButton(index)
         btn.hotTexts[i] = txt
     end
     btn:SetScript("OnEnter", function(self)
+        self.mouseHovered = true
+        UpdateTargetOutline(self)
         local S = EvsHL.S
-        local c = S and S.hoverColor or {1, 1, 1}
-        self.hover:SetBackdropBorderColor(c[1], c[2], c[3], 1)
-        self.hover:Show()
         if S and S.showTooltip and UnitFrame_OnEnter and self.unit and not self.sim then
             UnitFrame_OnEnter(self)
         end
     end)
     btn:SetScript("OnLeave", function(self)
-        self.hover:Hide()
+        self.mouseHovered = false
+        UpdateTargetOutline(self)
         local S = EvsHL.S
         if S and S.showTooltip and UnitFrame_OnLeave and not self.sim then
             UnitFrame_OnLeave(self)
