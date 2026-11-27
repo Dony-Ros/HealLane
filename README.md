@@ -1,6 +1,6 @@
 # HealLane
-HealLane is a healer addon for World of Warcraft that provides configurable unit frames and click casting. If you have used HealBot, the general idea may feel familiar, but HealLane is a newly created addon, not a port or copy of HealBot.
-The interface is intentionally simpler than addons with extensive skin editors. Its default layout is inspired by the familiar HealBot-style unit-frame layout, with practical healing tools and straightforward options.
+HealLane is a configurable unit-frame and click-casting addon for World of Warcraft. It combines party and raid monitoring with practical healing tools, spell and macro bindings, aura tracking, and debuff and buff management in a compact, customizable interface.
+HealLane is designed as a focused, independent addon for healers and group-oriented players. Its configurable layout emphasizes clear health information, raid awareness, smart casting, and straightforward setup without an extensive skin editor.
 ## Features
 - Click-cast spells, macros, and unit actions using mouse buttons and modifier keys, with optional per-click spell rank selection and automatic rank lowering for supported spells on low-level units.
 - Track configured healing-over-time effects (HoTs) on party and raid members.
