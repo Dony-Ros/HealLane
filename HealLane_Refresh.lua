@@ -2,7 +2,7 @@
 -- HealLane_Refresh.lua
 -- Drives the button updates and grid re-generation.
 -- ============================================================
-local EvsHL = EvsHL
+local HealLane = HealLane
 local function ThreatLevel(unit)
     if UnitThreatSituation then return UnitThreatSituation(unit) end
     if UnitDetailedThreatSituation then
@@ -10,13 +10,13 @@ local function ThreatLevel(unit)
         return status
     end
 end
-function EvsHL.UpdateButton(btn)
-    local S = EvsHL.S
+function HealLane.UpdateButton(btn)
+    local S = HealLane.S
     local now = GetTime()
-    if btn.sim then EvsHL.SimData(btn) else EvsHL.RealData(btn) end
+    if btn.sim then HealLane.SimData(btn) else HealLane.RealData(btn) end
     local rangeFallbackAlpha = S.rangeFallbackAlpha or 0.3
     local threat = not btn.sim and ThreatLevel(btn.unit)
-    btn.hasAggro = not btn.sim and S.aggroHighlight and not EvsHL.IsSecretValue(threat)
+    btn.hasAggro = not btn.sim and S.aggroHighlight and not HealLane.IsSecretValue(threat)
         and (threat or 0) >= 2
     local rangeAlpha = 1
     local distanceKnown = false
@@ -33,8 +33,8 @@ function EvsHL.UpdateButton(btn)
             or (UnitInRaid and UnitInRaid(btn.unit))
         if UnitInRange then
             local inRange, checkedRange = UnitInRange(btn.unit)
-            local inRangeIsSecret = EvsHL.IsSecretValue(inRange)
-            local checkedRangeIsSecret = EvsHL.IsSecretValue(checkedRange)
+            local inRangeIsSecret = HealLane.IsSecretValue(inRange)
+            local checkedRangeIsSecret = HealLane.IsSecretValue(checkedRange)
             local canCheckRange = false
             if checkedRangeIsSecret or inRangeIsSecret then
                 canCheckRange = isGroupUnit and true or false
@@ -44,7 +44,7 @@ function EvsHL.UpdateButton(btn)
                 canCheckRange = true
             end
             if canCheckRange then
-                if EvsHL.IsSecretValue(inRange) then
+                if HealLane.IsSecretValue(inRange) then
                     btn.rangeInRange = inRange
                     btn.hasSecretRange = true
                     btn.nearbyRange = inRange
@@ -68,12 +68,12 @@ function EvsHL.UpdateButton(btn)
             local distanceSquared, checkedDistance = UnitDistanceSquared(btn.unit)
             local fadeDistance = S.rangeFadeDistance or 60
             local farFadeDistance = S.farFadeDistance or 200
-            local checkedDistanceIsSecret = EvsHL.IsSecretValue(checkedDistance)
+            local checkedDistanceIsSecret = HealLane.IsSecretValue(checkedDistance)
             local distanceIsValid = false
             if not checkedDistanceIsSecret then
                 distanceIsValid = checkedDistance == nil or checkedDistance == true or checkedDistance == 1
             end
-            if distanceIsValid and not EvsHL.IsSecretValue(distanceSquared) and type(distanceSquared) == "number" then
+            if distanceIsValid and not HealLane.IsSecretValue(distanceSquared) and type(distanceSquared) == "number" then
                 distanceKnown = true
                 if distanceSquared >= farFadeDistance ^ 2 then
                     rangeAlpha = math.min(rangeAlpha, rangeFallbackAlpha)
@@ -106,14 +106,14 @@ function EvsHL.UpdateButton(btn)
     else
         btn:SetAlpha(rangeAlpha)
     end
-    EvsHL.UpdateDebuff(btn)
-    EvsHL.UpdateHealth(btn)
-    EvsHL.UpdateResourceBar(btn)
-    EvsHL.UpdateHealPrediction(btn, now)
-    EvsHL.UpdateHoTs(btn, now)
-    EvsHL.UpdateBuff(btn)
+    HealLane.UpdateDebuff(btn)
+    HealLane.UpdateHealth(btn)
+    HealLane.UpdateResourceBar(btn)
+    HealLane.UpdateHealPrediction(btn, now)
+    HealLane.UpdateHoTs(btn, now)
+    HealLane.UpdateBuff(btn)
     if btn.hasAggro then
-        local color = S.aggroColor or EvsHL.DEFAULTS.aggroColor
+        local color = S.aggroColor or HealLane.DEFAULTS.aggroColor
         btn.aggro:SetBackdropBorderColor(color[1], color[2], color[3], 1)
         btn.aggro:Show()
     else
@@ -122,11 +122,11 @@ function EvsHL.UpdateButton(btn)
 end
 -- Spell clicks run as a conditional macro so an invalid target (dead, gone, out of
 -- zone) fails silently instead of falling back to Auto Self-Cast.
-function EvsHL.CastMacro(spell, unit, deadOnly)
+function HealLane.CastMacro(spell, unit, deadOnly)
     return "/cast [@" .. unit .. ",help," .. (deadOnly and "dead" or "nodead") .. "] " .. spell
 end
 
-function EvsHL.ClickAction(btn, v, m, b, blank, rank)
+function HealLane.ClickAction(btn, v, m, b, blank, rank)
     local macro = v and v:match("^m:(.+)")
     local action = v and v:match("^a:(.+)")
     if macro then
@@ -136,11 +136,7 @@ function EvsHL.ClickAction(btn, v, m, b, blank, rank)
         if action ~= "target" or btn.unit ~= "target" then return action end
     elseif v and v ~= "" then
         local spell = rank and (v .. "(" .. rank .. ")") or v
-        return "macro", nil, nil, EvsHL.CastMacro(spell, btn.unit)
-    elseif not blank and m == "" and b == 1 then
-        if btn.unit ~= "target" then return "target" end
-    elseif not blank and m == "" and b == 2 then
-        return "menu"
+        return "macro", nil, nil, HealLane.CastMacro(spell, btn.unit)
     end
 end
 
@@ -148,21 +144,21 @@ local function RankNumber(rank)
     return type(rank) == "string" and tonumber(rank:match("(%d+)")) or nil
 end
 
-function EvsHL.GetSpellRankForUnit(spellName, unit, selectedRank)
-    local S = EvsHL.S
+function HealLane.GetSpellRankForUnit(spellName, unit, selectedRank)
+    local S = HealLane.S
     if not S.autoDownrank or not spellName or not unit then
         return selectedRank
     end
 
-    local entry = spellName and EvsHL.FindSpell(spellName)
-    local fallbackLevels = EvsHL.SPELL_RANK_LEARN_LEVELS[spellName]
+    local entry = spellName and HealLane.FindSpell(spellName)
+    local fallbackLevels = HealLane.SPELL_RANK_LEARN_LEVELS[spellName]
     if not entry or not entry.ranks
         or (not fallbackLevels and (not entry.rankLearnLevels or not next(entry.rankLearnLevels))) then
         return selectedRank
     end
 
     local targetLevel = UnitLevel(unit)
-    if EvsHL.IsSecretValue(targetLevel) or type(targetLevel) ~= "number" or targetLevel < 1 then
+    if HealLane.IsSecretValue(targetLevel) or type(targetLevel) ~= "number" or targetLevel < 1 then
         return selectedRank
     end
 
@@ -191,20 +187,20 @@ function EvsHL.GetSpellRankForUnit(spellName, unit, selectedRank)
     return bestRank or lowestRank or selectedRank
 end
 
-function EvsHL.GetClickRank(btn, slotKey)
-    local S = EvsHL.S
+function HealLane.GetClickRank(btn, slotKey)
+    local S = HealLane.S
     local selectedRank = S.clickRanks and S.clickRanks[slotKey]
     if not btn or btn.sim or not btn.unit then return selectedRank end
-    return EvsHL.GetSpellRankForUnit(S.clicks[slotKey], btn.unit, selectedRank)
+    return HealLane.GetSpellRankForUnit(S.clicks[slotKey], btn.unit, selectedRank)
 end
 
-function EvsHL.ApplyClicks(btn, blank)
-    local S = EvsHL.S
-    for _, m in ipairs(EvsHL.MODS) do
+function HealLane.ApplyClicks(btn, blank)
+    local S = HealLane.S
+    for _, m in ipairs(HealLane.MODS) do
         for b = 1, 5 do
             local v = not blank and S.clicks[m .. b]
-            local rank = EvsHL.GetClickRank(btn, m .. b)
-            local t, spell, mac, macText = EvsHL.ClickAction(btn, v, m, b, blank, rank)
+            local rank = HealLane.GetClickRank(btn, m .. b)
+            local t, spell, mac, macText = HealLane.ClickAction(btn, v, m, b, blank, rank)
             btn:SetAttribute(m .. "type" .. b, t)
             btn:SetAttribute(m .. "spell" .. b, spell)
             btn:SetAttribute(m .. "macro" .. b, mac)
@@ -214,54 +210,54 @@ function EvsHL.ApplyClicks(btn, blank)
 end
 
 local function SyncButtonLabels(btn)
-    EvsHL.UpdateName(btn)
+    HealLane.UpdateName(btn)
     if btn.isPet then
         btn.role = "DPS"
         btn.roleIcon:Hide()
     else
-        if EvsHL.IsTank(btn.unit) then
+        if HealLane.IsTank(btn.unit) then
             btn.role = "TANK"
-        elseif EvsHL.IsHeal(btn.unit) then
+        elseif HealLane.IsHeal(btn.unit) then
             btn.role = "HEALER"
         else
             btn.role = "DPS"
         end
-        EvsHL.UpdateUnitRoleIcon(btn)
+        HealLane.UpdateUnitRoleIcon(btn)
     end
-    EvsHL.UpdateUnitRaidIcon(btn)
+    HealLane.UpdateUnitRaidIcon(btn)
 end
 
 -- Combat-safe: only touches text/textures, never secure frame layout or attributes.
-function EvsHL.SyncLabels()
-    for _, btn in ipairs(EvsHL.buttons) do
+function HealLane.SyncLabels()
+    for _, btn in ipairs(HealLane.buttons) do
         if btn.unit and not btn.sim and btn:IsShown() then
             pcall(SyncButtonLabels, btn)
         end
     end
 end
 
-function EvsHL.Refresh()
-    local S = EvsHL.S
+function HealLane.Refresh()
+    local S = HealLane.S
     if not S then return end
     if InCombatLockdown() then
-        EvsHL.pending = true
-        EvsHL.SyncLabels()
+        HealLane.pending = true
+        HealLane.SyncLabels()
         return
     end
-    EvsHL.pending = false
-    local sim = EvsHL.simCount or 0
-    local raid = EvsHL.NumRaid() > 0
+    HealLane.pending = false
+    local sim = HealLane.simCount or 0
+    local raid = HealLane.NumRaid() > 0
     local list = {}
     if sim > 0 then
         for i = 1, sim do list[i] = "sim" end
     elseif raid then
-        for i = 1, math.min(EvsHL.NumRaid(), #EvsHL.buttons) do
+        for i = 1, math.min(HealLane.NumRaid(), #HealLane.buttons) do
             local unit = "raid" .. i
             if S.showPlayer or not UnitIsUnit(unit, "player") then list[#list + 1] = unit end
         end
     else
         if S.showPlayer then list[#list + 1] = "player" end
-        for i = 1, EvsHL.NumParty() do list[#list + 1] = "party" .. i end
+        for i = 1, HealLane.NumParty() do list[#list + 1] = "party" .. i end
     end
     local cols = S.cols
     local roleColumns = cols
@@ -272,15 +268,15 @@ function EvsHL.Refresh()
     local petList = {}
     if S.showPets and sim == 0 then
         local function AddPet(petUnit)
-            if #list + #petList < EvsHL.MAX_UNITS and UnitExists(petUnit) then
+            if #list + #petList < HealLane.MAX_UNITS and UnitExists(petUnit) then
                 petList[#petList + 1] = petUnit
             end
         end
         if raid then
-            for i = 1, EvsHL.NumRaid() do AddPet("raidpet" .. i) end
+            for i = 1, HealLane.NumRaid() do AddPet("raidpet" .. i) end
         else
             if S.showPlayer then AddPet("pet") end
-            for i = 1, EvsHL.NumParty() do AddPet("partypet" .. i) end
+            for i = 1, HealLane.NumParty() do AddPet("partypet" .. i) end
         end
     end
     local petsOrdered = false
@@ -288,7 +284,7 @@ function EvsHL.Refresh()
         local combined = {}
         for _, u in ipairs(list) do combined[#combined + 1] = u end
         for _, u in ipairs(petList) do combined[#combined + 1] = u end
-        local ordered, positions, rowCount, colsUsed = EvsHL.GetOrderedList(combined, raid, cols)
+        local ordered, positions, rowCount, colsUsed = HealLane.GetOrderedList(combined, raid, cols)
         if ordered then
             list = {}
             for _, u in ipairs(ordered) do list[#list + 1] = u end
@@ -300,7 +296,7 @@ function EvsHL.Refresh()
         if #list > 1 then
             table.sort(list, function(a, b)
                 local nameA, nameB = UnitName(a), UnitName(b)
-                if EvsHL.IsSecretValue(nameA) or EvsHL.IsSecretValue(nameB)
+                if HealLane.IsSecretValue(nameA) or HealLane.IsSecretValue(nameB)
                     or (nameA ~= nil and type(nameA) ~= "string")
                     or (nameB ~= nil and type(nameB) ~= "string") then
                     return a < b
@@ -310,26 +306,26 @@ function EvsHL.Refresh()
         end
         for _, u in ipairs(petList) do list[#list + 1] = u end
     end
-    EvsHL.orderSignature = table.concat(list, ",")
+    HealLane.orderSignature = table.concat(list, ",")
     local realCount = #list
     if sim == 0 then
         local function AddSpare(token)
-            if #list < EvsHL.MAX_UNITS and not UnitExists(token) then
+            if #list < HealLane.MAX_UNITS and not UnitExists(token) then
                 list[#list + 1] = token
             end
         end
         if raid then
-            for n = EvsHL.NumRaid() + 1, EvsHL.MAX_UNITS do AddSpare("raid" .. n) end
+            for n = HealLane.NumRaid() + 1, HealLane.MAX_UNITS do AddSpare("raid" .. n) end
         else
-            for n = EvsHL.NumParty() + 1, 4 do AddSpare("party" .. n) end
+            for n = HealLane.NumParty() + 1, 4 do AddSpare("party" .. n) end
             if S.showPets then
                 AddSpare("pet")
                 for n = 1, 4 do AddSpare("partypet" .. n) end
             end
         end
     end
-    for i = 1, EvsHL.MAX_UNITS do
-        local btn = EvsHL.buttons[i] or EvsHL.CreateUnitButton(i)
+    for i = 1, HealLane.MAX_UNITS do
+        local btn = HealLane.buttons[i] or HealLane.CreateUnitButton(i)
         local unit = list[i]
         if unit then
             if btn.unit ~= unit then
@@ -360,20 +356,20 @@ function EvsHL.Refresh()
                 colIndex = rolePositions and rolePositions[i].col or ((i - 1) % cols)
             end
             if S.frameAnchor == "TOPRIGHT" then
-                xPos = -(EvsHL.OUTER + (S.width + S.padding) * colIndex)
-                yPos = -(EvsHL.OUTER + (S.height + S.padding) * rowIndex)
-                btn:SetPoint("TOPRIGHT", EvsHL.parentFrame, "TOPRIGHT", xPos, yPos)
+                xPos = -(HealLane.OUTER + (S.width + S.padding) * colIndex)
+                yPos = -(HealLane.OUTER + (S.height + S.padding) * rowIndex)
+                btn:SetPoint("TOPRIGHT", HealLane.parentFrame, "TOPRIGHT", xPos, yPos)
             else
-                xPos = EvsHL.OUTER + (S.width + S.padding) * colIndex
-                yPos = -(EvsHL.OUTER + (S.height + S.padding) * rowIndex)
-                btn:SetPoint("TOPLEFT", EvsHL.parentFrame, "TOPLEFT", xPos, yPos)
+                xPos = HealLane.OUTER + (S.width + S.padding) * colIndex
+                yPos = -(HealLane.OUTER + (S.height + S.padding) * rowIndex)
+                btn:SetPoint("TOPLEFT", HealLane.parentFrame, "TOPLEFT", xPos, yPos)
             end
             btn.isPet = type(unit) == "string" and unit:find("pet") ~= nil
             if unit == "sim" then
                 btn.sim = i
                 btn.unit = "player"
                 btn:SetAttribute("unit", "player")
-                EvsHL.ApplyClicks(btn, true)
+                HealLane.ApplyClicks(btn, true)
                 if btn.tempTargetDriver then
                     UnregisterStateDriver(btn, "visibility")
                     btn.tempTargetDriver = nil
@@ -383,14 +379,14 @@ function EvsHL.Refresh()
                     btn.watched = false
                 end
                 btn:Show()
-                EvsHL.UpdateUnitRoleIcon(btn)
-                EvsHL.UpdateUnitRaidIcon(btn)
-                EvsHL.UpdateName(btn)
+                HealLane.UpdateUnitRoleIcon(btn)
+                HealLane.UpdateUnitRaidIcon(btn)
+                HealLane.UpdateName(btn)
             elseif unit == "target" then
                 btn.sim = nil
                 btn.unit = "target"
                 btn:SetAttribute("unit", "target")
-                EvsHL.ApplyClicks(btn)
+                HealLane.ApplyClicks(btn)
                 if not btn.tempTargetDriver then
                     RegisterStateDriver(btn, "visibility", "[@target,help] show; hide")
                     btn.tempTargetDriver = true
@@ -400,8 +396,8 @@ function EvsHL.Refresh()
                     btn.watched = false
                 end
                 btn:Show()
-                EvsHL.UpdateName(btn)
-                EvsHL.UpdateUnitRaidIcon(btn)
+                HealLane.UpdateName(btn)
+                HealLane.UpdateUnitRaidIcon(btn)
             else
                 btn.sim = nil
                 btn.unit = unit
@@ -410,7 +406,7 @@ function EvsHL.Refresh()
                 btn.dead = UnitIsDeadOrGhost(btn.unit)
                 btn.online = UnitIsConnected(btn.unit)
                 btn:SetAttribute("unit", unit)
-                EvsHL.ApplyClicks(btn)
+                HealLane.ApplyClicks(btn)
                 if btn.tempTargetDriver then
                     UnregisterStateDriver(btn, "visibility")
                     btn.tempTargetDriver = nil
@@ -428,18 +424,18 @@ function EvsHL.Refresh()
                     if btn.isPet then
                         btn.role = "DPS"
                         btn.roleIcon:Hide()
-                    elseif EvsHL.IsTank(unit) then
+                    elseif HealLane.IsTank(unit) then
                         btn.role = "TANK"
-                    elseif EvsHL.IsHeal(unit) then
+                    elseif HealLane.IsHeal(unit) then
                         btn.role = "HEALER"
                     else
                         btn.role = "DPS"
                     end
                     if not btn.isPet then
-                        EvsHL.UpdateUnitRoleIcon(btn)
+                        HealLane.UpdateUnitRoleIcon(btn)
                     end
-                    EvsHL.UpdateUnitRaidIcon(btn)
-                    EvsHL.UpdateName(btn)
+                    HealLane.UpdateUnitRaidIcon(btn)
+                    HealLane.UpdateName(btn)
                 end
             end
             btn.shownName = nil
@@ -457,7 +453,7 @@ function EvsHL.Refresh()
             btn:Hide()
         end
     end
-    EvsHL.activeCount = realCount
+    HealLane.activeCount = realCount
     local total = math.max(realCount, 1)
     local rows
     if rolePositions then
@@ -466,11 +462,11 @@ function EvsHL.Refresh()
         rows = math.ceil(total / cols)
     end
     rows = math.max(rows, 1)
-    EvsHL.parentFrame:SetWidth((S.width + S.padding) * math.min(roleColumns, total) - S.padding + EvsHL.OUTER * 2)
-    EvsHL.parentFrame:SetHeight((S.height + S.padding) * rows - S.padding + EvsHL.OUTER * 2 + (S.locked and 0 or 16))
-    EvsHL.handleText:SetText(sim > 0 and "Options - simulation" or "Options")
-    local solo = sim == 0 and not raid and EvsHL.NumParty() == 0
-    if S.hideSolo and solo and S.locked then EvsHL.parentFrame:Hide() else EvsHL.parentFrame:Show() end
-    EvsHL.ApplyVisuals()
-    if EvsHL.UpdateTargetOutline then EvsHL.UpdateTargetOutline() end
+    HealLane.parentFrame:SetWidth((S.width + S.padding) * math.min(roleColumns, total) - S.padding + HealLane.OUTER * 2)
+    HealLane.parentFrame:SetHeight((S.height + S.padding) * rows - S.padding + HealLane.OUTER * 2 + (S.locked and 0 or 16))
+    HealLane.handleText:SetText(sim > 0 and "Options - simulation" or "Options")
+    local solo = sim == 0 and not raid and HealLane.NumParty() == 0
+    if S.hideSolo and solo and S.locked then HealLane.parentFrame:Hide() else HealLane.parentFrame:Show() end
+    HealLane.ApplyVisuals()
+    if HealLane.UpdateTargetOutline then HealLane.UpdateTargetOutline() end
 end

@@ -1,11 +1,11 @@
 -- ============================================================
 -- HealLane_Constants.lua
--- Creates the global EvsHL namespace and defines every shared
+-- Creates the global HealLane namespace and defines every shared
 -- constant + tiny helper. MUST load before any other HealLane
 -- module (it is the very first <Script> in HealLane.xml).
 -- ============================================================
-local EvsHL = {}
-_G.EvsHL = EvsHL
+local HealLane = {}
+_G.HealLane = HealLane
 
 -- ============================================================
 -- Shared tiny helpers (defined here so every module can use them
@@ -14,7 +14,30 @@ _G.EvsHL = EvsHL
 local function IsSecretValue(value)
     return issecretvalue and issecretvalue(value) or false
 end
-EvsHL.IsSecretValue = IsSecretValue
+HealLane.IsSecretValue = IsSecretValue
+
+local function HealLaneModUI()
+    local library = _G.HealLaneModUI or _G.GameUtilityUI
+    if type(library) == "table" then
+        return library
+    end
+end
+
+function HealLane.ApplyPixelPerfectFontString(fontString)
+    local library = HealLaneModUI()
+    if library and type(library.ApplyPixelPerfectFontString) == "function" then
+        return library:ApplyPixelPerfectFontString(fontString)
+    end
+    return fontString
+end
+
+function HealLane.CreateFontString(parent, name, layer, template)
+    local library = HealLaneModUI()
+    if library and type(library.CreatePixelPerfectFontString) == "function" then
+        return library:CreatePixelPerfectFontString(parent, name, layer, template)
+    end
+    return HealLane.ApplyPixelPerfectFontString(parent:CreateFontString(name, layer, template))
+end
 
 local function Copy(v)
     if type(v) ~= "table" then return v end
@@ -22,16 +45,16 @@ local function Copy(v)
     for k, x in pairs(v) do t[k] = Copy(x) end
     return t
 end
-EvsHL.Copy = Copy
+HealLane.Copy = Copy
 
 local function Merge(dst, src)
     for k, v in pairs(src) do
         if dst[k] == nil then dst[k] = Copy(v) end
     end
 end
-EvsHL.Merge = Merge
+HealLane.Merge = Merge
 
-function EvsHL.SetTextureColor(texture, r, g, b, a)
+function HealLane.SetTextureColor(texture, r, g, b, a)
     if texture.SetColorTexture then
         texture:SetColorTexture(r, g, b, a)
     else
@@ -39,12 +62,22 @@ function EvsHL.SetTextureColor(texture, r, g, b, a)
     end
 end
 
-function EvsHL.GetS() return EvsHL.S end
+function HealLane.GetS() return HealLane.S end
 
 -- ============================================================
 -- Defaults / constants
 -- ============================================================
-EvsHL.DEFAULTS = {
+HealLane.GLOBAL_SETTING_KEYS = {
+    locked = true,
+    chatRoleIcons = true,
+    nameAlert = true,
+    hideBlizzardPartyFrames = true,
+    hideBlizzardRaidFrames = true,
+}
+
+HealLane.DEFAULTS = {
+    profileName = "Default",
+    pvp = { ["10"] = {}, ["25"] = {}, ["40"] = {} },
     locked = false,
     showPlayer = true,
     hideSolo = false,
@@ -60,6 +93,28 @@ EvsHL.DEFAULTS = {
     fontOutline = "OUTLINE",
     fontMonochrome = false,
     fontShadow = false,
+    fontShadowColor = { 0, 0, 0 },
+    fontShadowOffsetX = 1,
+    fontShadowOffsetY = -1,
+    nameFontSize = 0,
+    nameFontFace = "",
+    nameFontOutline = "inherit",
+    nameShadow = "inherit",
+    nameShadowColor = { 0, 0, 0 },
+    nameShadowOffsetX = 1,
+    nameShadowOffsetY = -1,
+    nameColorMode = "class",
+    nameColor = { 1, 1, 1 },
+    nameJustifyH = "CENTER",
+    healthFontSize = 0,
+    healthFontFace = "",
+    healthFontOutline = "inherit",
+    healthShadow = "inherit",
+    healthShadowColor = { 0, 0, 0 },
+    healthShadowOffsetX = 1,
+    healthShadowOffsetY = -1,
+    healthTextColorMode = "white",
+    healthTextColor = { 1, 1, 1 },
     showBorder = false,
     showTooltip = false,
     hoverColor = { 1, 1, 1 },
@@ -106,8 +161,15 @@ EvsHL.DEFAULTS = {
     debuffMagicColor = { 0.65, 0.65, 0.65 },
     debuffBleedColor = { 0.9, 0.1, 0.1 },
     smartCast = true,
-    clicks = { ["shift-6"] = "a:role", ["shift-7"] = "a:role" },
+    clicks = {
+        ["1"] = "a:target",
+        ["2"] = "a:menu",
+        ["shift-6"] = "a:role",
+        ["shift-7"] = "a:role",
+    },
     clickRanks = {},
+    clickSets = {},
+    activeClickSet = "Default",
     autoDownrank = false,
     hots = {},
     hotsSeen = {},
@@ -135,7 +197,7 @@ EvsHL.DEFAULTS = {
 }
 
 -- WoW: Forever rank learning levels used by the optional target-level rank rule.
-EvsHL.SPELL_RANK_LEARN_LEVELS = {
+HealLane.SPELL_RANK_LEARN_LEVELS = {
     ["Chain Heal"] = { 40, 46, 54 },
     ["Flash Heal"] = { 20, 26, 32, 38, 44, 50, 56 },
     ["Flash of Light"] = { 20, 26, 34, 42, 50, 58 },
@@ -152,7 +214,7 @@ EvsHL.SPELL_RANK_LEARN_LEVELS = {
     ["Renew"] = { 8, 14, 20, 26, 32, 38, 44, 50, 56, 60 },
 }
 
-EvsHL.KNOWN_HOTS = {
+HealLane.KNOWN_HOTS = {
     ["Rejuvenation"] = true,
     ["Regrowth"] = true,
     ["Lifebloom"] = true,
@@ -166,21 +228,21 @@ EvsHL.KNOWN_HOTS = {
     ["Sacred Shield"] = true,
 }
 
-EvsHL.MAX_UNITS = 40
-EvsHL.MAX_HOTS  = 8
-EvsHL.OUTER     = 4
-EvsHL.FLAT      = "Interface\\Buttons\\WHITE8x8"
-EvsHL.FONT      = "Fonts\\FRIZQT__.TTF"
-EvsHL.MODS      = { "", "shift-", "ctrl-", "alt-", "ctrl-shift-", "alt-shift-", "alt-ctrl-", "alt-ctrl-shift-" }
+HealLane.MAX_UNITS = 40
+HealLane.MAX_HOTS  = 8
+HealLane.OUTER     = 4
+HealLane.FLAT      = "Interface\\Buttons\\WHITE8x8"
+HealLane.FONT      = "Fonts\\FRIZQT__.TTF"
+HealLane.MODS      = { "", "shift-", "ctrl-", "alt-", "ctrl-shift-", "alt-shift-", "alt-ctrl-", "alt-ctrl-shift-" }
 
-EvsHL.DEBUFF_TYPE_COLORS = {
+HealLane.DEBUFF_TYPE_COLORS = {
     Curse   = { r = 1,    g = 0.45, b = 0.05 },
     Poison  = { r = 0,    g = 0.35, b = 0.15 },
     Disease = { r = 0.62, g = 0.16, b = 0.82 },
     Magic   = { r = 0.65, g = 0.65, b = 0.65 },
     Bleed   = { r = 0.9,  g = 0.1,  b = 0.1  },
 }
-EvsHL.DEBUFF_COLOR_KEYS = {
+HealLane.DEBUFF_COLOR_KEYS = {
     Curse   = "debuffCurseColor",
     Poison  = "debuffPoisonColor",
     Disease = "debuffDiseaseColor",
@@ -188,7 +250,7 @@ EvsHL.DEBUFF_COLOR_KEYS = {
     Bleed   = "debuffBleedColor",
 }
 
-EvsHL.BUFF_TARGETS = {
+HealLane.BUFF_TARGETS = {
     { "any", "Anyone" },
     { "tank", "Tanks only" },
     { "healer", "Healers only" },
@@ -196,7 +258,7 @@ EvsHL.BUFF_TARGETS = {
     { "self", "Myself only" },
 }
 
-EvsHL.BUFF_EXPIRE_OPTIONS = {
+HealLane.BUFF_EXPIRE_OPTIONS = {
     { 0, "Off" },
     { 30, "30 seconds" },
     { 60, "1 minute" },
@@ -206,8 +268,8 @@ EvsHL.BUFF_EXPIRE_OPTIONS = {
 }
 
 -- Seconds left on an aura (math.huge when it has no expiration).
-function EvsHL.BuffRemaining(duration, expires)
-    if EvsHL.IsSecretValue(duration) or EvsHL.IsSecretValue(expires) then return math.huge end
+function HealLane.BuffRemaining(duration, expires)
+    if HealLane.IsSecretValue(duration) or HealLane.IsSecretValue(expires) then return math.huge end
     if not duration or duration == 0 or not expires or expires == 0 then return math.huge end
     return expires - GetTime()
 end
@@ -215,9 +277,9 @@ end
 -- True when the buff is absent, or present but inside the expiry warning window.
 local wildBuffEquivalents
 local function GetWildBuffEquivalent(name)
-    if not wildBuffEquivalents and EvsHL.GetSpellInfo then
-        local markName = EvsHL.GetSpellInfo(1126)
-        local giftName = EvsHL.GetSpellInfo(21849)
+    if not wildBuffEquivalents and HealLane.GetSpellInfo then
+        local markName = HealLane.GetSpellInfo(1126)
+        local giftName = HealLane.GetSpellInfo(21849)
         if type(markName) == "string" and type(giftName) == "string" then
             wildBuffEquivalents = {
                 [markName] = giftName,
@@ -228,23 +290,23 @@ local function GetWildBuffEquivalent(name)
     return wildBuffEquivalents and wildBuffEquivalents[name]
 end
 
-function EvsHL.BuffLacking(buffs, name)
+function HealLane.BuffLacking(buffs, name)
     local remaining = buffs[name]
     if not remaining then
         local equivalent = GetWildBuffEquivalent(name)
         remaining = equivalent and buffs[equivalent]
     end
     if not remaining then return true end
-    local warn = EvsHL.S and EvsHL.S.buffExpireWarn or 0
+    local warn = HealLane.S and HealLane.S.buffExpireWarn or 0
     return warn > 0 and remaining <= warn
 end
 
-function EvsHL.RecordBuffAura(buffs, name, spellID, duration, expires)
-    if EvsHL.IsSecretValue(name) or type(name) ~= "string" then return false end
-    local remaining = EvsHL.BuffRemaining(duration, expires)
+function HealLane.RecordBuffAura(buffs, name, spellID, duration, expires)
+    if HealLane.IsSecretValue(name) or type(name) ~= "string" then return false end
+    local remaining = HealLane.BuffRemaining(duration, expires)
     buffs[name] = math.max(buffs[name] or 0, remaining)
-    if type(spellID) == "number" and not EvsHL.IsSecretValue(spellID) then
-        for _, spell in ipairs(EvsHL.spells or {}) do
+    if type(spellID) == "number" and not HealLane.IsSecretValue(spellID) then
+        for _, spell in ipairs(HealLane.spells or {}) do
             if type(spell.name) == "string" and spell.spellIDs and spell.spellIDs[spellID] then
                 buffs[spell.name] = math.max(buffs[spell.name] or 0, remaining)
             end
@@ -254,7 +316,7 @@ function EvsHL.RecordBuffAura(buffs, name, spellID, duration, expires)
 end
 
 -- Pets never need tracked buffs. Legacy `true` entries mean "any".
-function EvsHL.BuffTargetMatches(btn, target)
+function HealLane.BuffTargetMatches(btn, target)
     if not target or btn.isPet then return false end
     if target == true or target == "any" then return true end
     if target == "tank" then return btn.role == "TANK" end
@@ -267,14 +329,14 @@ end
 -- ============================================================
 -- Shared mutable state (populated by later modules / init).
 -- ============================================================
-EvsHL.buttons      = {}
-EvsHL.pending      = false
-EvsHL.pendingCast  = nil
-EvsHL.nativeAuraSupported = false
-EvsHL.nativeAuraWarnings  = {}
+HealLane.buttons      = {}
+HealLane.pending      = false
+HealLane.pendingCast  = nil
+HealLane.nativeAuraSupported = false
+HealLane.nativeAuraWarnings  = {}
 
 -- Legacy aliases preserved for the config files & external addons.
-EvsHL.defaults = EvsHL.DEFAULTS
-EvsHL.mods     = EvsHL.MODS
-EvsHL.simCount = 0
-EvsHL.ver      = 0
+HealLane.defaults = HealLane.DEFAULTS
+HealLane.mods     = HealLane.MODS
+HealLane.simCount = 0
+HealLane.ver      = 0

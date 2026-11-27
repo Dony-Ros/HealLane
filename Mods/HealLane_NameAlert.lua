@@ -1,6 +1,6 @@
 -- Name alert: briefly flashes a message in the middle of the screen when
 -- someone mentions your character name in chat (full name, name, or first 3 or 4 letters).
-local EvsHL = EvsHL
+local HealLane = HealLane
 
 local HOLD, FADE = 2.5, 0.6
 local CHAT_EVENTS = {
@@ -20,14 +20,14 @@ local function Ensure()
     if alert then
         return
     end
-    alert = CreateFrame("Frame", "EvsHLNameAlert", UIParent)
+    alert = CreateFrame("Frame", "HealLaneNameAlert", UIParent)
     alert:SetSize(700, 60)
     alert:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
     alert:SetFrameStrata("FULLSCREEN_DIALOG")
     alert:EnableMouse(false)
     alert:Hide()
-    text = alert:CreateFontString(nil, "OVERLAY")
-    text:SetFont(EvsHL.FONT, 24, "OUTLINE")
+    text = HealLane.CreateFontString(alert, nil, "OVERLAY")
+    text:SetFont(HealLane.FONT, 24, "OUTLINE")
     text:SetPoint("CENTER")
     text:SetWidth(680)
     alert:SetScript("OnUpdate", function(self)
@@ -101,14 +101,14 @@ for _, event in ipairs(CHAT_EVENTS) do
     pcall(events.RegisterEvent, events, event)
 end
 events:SetScript("OnEvent", function(_, event, msg, sender)
-    local S = EvsHL.S
+    local S = HealLane.S
     if not (S and S.nameAlert) then
         return
     end
-    if type(msg) ~= "string" or EvsHL.IsSecretValue(msg) then
+    if type(msg) ~= "string" or HealLane.IsSecretValue(msg) then
         return
     end
-    if type(sender) == "string" and not EvsHL.IsSecretValue(sender) then
+    if type(sender) == "string" and not HealLane.IsSecretValue(sender) then
         local me = UnitName("player")
         if sender == me or sender:match("^[^-]+") == me then
             return

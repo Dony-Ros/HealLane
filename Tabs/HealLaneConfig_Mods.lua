@@ -1,8 +1,8 @@
 -- Mods tab: options for the optional HealLane mods (kept out of the General tab).
-local EvsHL = EvsHL
+local HealLane = HealLane
 
-function EvsHL.BuildModsTab(page)
-    local H = EvsHL.ConfigHelpers
+function HealLane.BuildModsTab(page)
+    local H = HealLane.ConfigHelpers
     local function Nothing() end
 
     local chatBox = H.Section(page, "Chat", -4, 92)

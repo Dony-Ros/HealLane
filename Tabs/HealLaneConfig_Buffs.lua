@@ -1,8 +1,8 @@
-local EvsHL = EvsHL
+local HealLane = HealLane
 local S
-local H = EvsHL.ConfigHelpers
-function EvsHL.BuildBuffsTab(page)
-    S = EvsHL.S
+local H = HealLane.ConfigHelpers
+function HealLane.BuildBuffsTab(page)
+    S = HealLane.S
     local MAXROWS = 16
     local rows = {}
     local List
@@ -26,13 +26,13 @@ function EvsHL.BuildBuffsTab(page)
             List()
         end)
     end)
-    H.Field(options, "Recast buffs expiring within:", 250, -26, 120, EvsHL.BUFF_EXPIRE_OPTIONS,
+    H.Field(options, "Recast buffs expiring within:", 250, -26, 120, HealLane.BUFF_EXPIRE_OPTIONS,
         function() return S.buffExpireWarn or 0 end,
         function(v) S.buffExpireWarn = v end)
-    H.AddCheck(options, "Monitor missing buffs", 8, -80, "monitorMissingBuffs", EvsHL.ApplyVisuals)
-    H.AddCheck(options, "Highlight missing buffs", 235, -80, "buffBorder", EvsHL.ApplyVisuals)
-    H.AddCheck(options, "Check missing buffs on units in combat", 8, -108, "checkBuffsInCombat", EvsHL.ApplyVisuals)
-    H.AddColor(options, "Missing Buff Color", 243, -112, "buffsMissingColor", EvsHL.ApplyVisuals)
+    H.AddCheck(options, "Monitor missing buffs", 8, -80, "monitorMissingBuffs", HealLane.ApplyVisuals)
+    H.AddCheck(options, "Highlight missing buffs", 235, -80, "buffBorder", HealLane.ApplyVisuals)
+    H.AddCheck(options, "Check missing buffs on units in combat", 8, -108, "checkBuffsInCombat", HealLane.ApplyVisuals)
+    H.AddColor(options, "Missing Buff Color", 243, -112, "buffsMissingColor", HealLane.ApplyVisuals)
 
     local listBox = H.Section(page, "Tracked buffs", -156, 384)
     H.Tooltip(listBox.titleButton, "Choose which unit types each buff is tracked on. Pets are always ignored.")
@@ -43,16 +43,16 @@ function EvsHL.BuildBuffsTab(page)
         row:SetPoint("TOPLEFT", 12, -28 - (i - 1) * 22)
         row.icon = row:CreateTexture(nil, "ARTWORK")
         row.icon:SetWidth(18) row.icon:SetHeight(18) row.icon:SetPoint("LEFT", 0, 0)
-        row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        row.text = HealLane.CreateFontString(row, nil, "OVERLAY", "GameFontHighlight")
         row.text:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
         row.text:SetWidth(150)
         row.text:SetJustifyH("LEFT")
-        EvsHL.ConfigUI:StyleText(row.text)
-        row.dd = H.AddDropdown(row, 210, 2, 150, EvsHL.BUFF_TARGETS,
+        HealLane.ConfigUI:StyleText(row.text)
+        row.dd = H.AddDropdown(row, 210, 2, 150, HealLane.BUFF_TARGETS,
             function() return TargetOf(row.spell) end,
             function(v) if row.spell then S.trackBuffs[row.spell] = v end end)
         row.remove = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-        EvsHL.ConfigUI:StyleButton(row.remove)
+        HealLane.ConfigUI:StyleButton(row.remove)
         row.remove:SetWidth(22) row.remove:SetHeight(20) row.remove:SetPoint("RIGHT", -5, 0) row.remove:SetText("X")
         row.remove:SetScript("OnClick", function()
             S.trackBuffs[row.spell] = nil
@@ -70,7 +70,7 @@ function EvsHL.BuildBuffsTab(page)
             if n then
                 row.spell = n
                 row.text:SetText(n)
-                row.icon:SetTexture(EvsHL.GetSpellTexture(n))
+                row.icon:SetTexture(HealLane.GetSpellTexture(n))
                 row.dd:SetValue(TargetOf(n))
                 row:Show()
             else
@@ -79,5 +79,5 @@ function EvsHL.BuildBuffsTab(page)
             end
         end
     end
-    EvsHL.AddConfigWidget(List)
+    HealLane.AddConfigWidget(List)
 end

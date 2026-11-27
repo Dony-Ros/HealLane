@@ -1,8 +1,8 @@
-local EvsHL = EvsHL
+local HealLane = HealLane
 local S
-local H = EvsHL.ConfigHelpers
-function EvsHL.BuildCureTab(page)
-    S = EvsHL.S
+local H = HealLane.ConfigHelpers
+function HealLane.BuildCureTab(page)
+    S = HealLane.S
     local MAXROWS = 6
     local rows = {}
     local List
@@ -18,7 +18,7 @@ function EvsHL.BuildCureTab(page)
             end
             S.dispel.spells[e.name] = { spell = e.name, types = {} }
             List()
-            EvsHL.ApplyVisuals()
+            HealLane.ApplyVisuals()
         end)
     end)
     local types = { "Magic", "Curse", "Disease", "Poison", "Bleed" }
@@ -45,7 +45,7 @@ function EvsHL.BuildCureTab(page)
         row.icon:SetWidth(18)
         row.icon:SetHeight(18)
         row.icon:SetPoint("LEFT", 0, 0)
-        row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        row.text = HealLane.CreateFontString(row, nil, "OVERLAY", "GameFontHighlight")
         row.text:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
         row.text:SetWidth(98)
         row.text:SetJustifyH("LEFT")
@@ -59,13 +59,13 @@ function EvsHL.BuildCureTab(page)
             entry.types = entry.types or {}
             entry.types[typeName] = not entry.types[typeName]
             UpdateTypeDropdown(row)
-            EvsHL.ApplyVisuals()
+            HealLane.ApplyVisuals()
         end
-        row.typeDropdown = EvsHL.ConfigUI:CreateMultiDropdown(row, nil, 150, types,
+        row.typeDropdown = HealLane.ConfigUI:CreateMultiDropdown(row, nil, 150, types,
             function() return GetTypeSummary(row) end, IsTypeSelected, ToggleType)
         row.typeDropdown:SetPoint("LEFT", row, "LEFT", 130, 0)
         row.remove = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-        EvsHL.ConfigUI:StyleButton(row.remove)
+        HealLane.ConfigUI:StyleButton(row.remove)
         row.remove:SetWidth(22)
         row.remove:SetHeight(20)
         row.remove:SetPoint("RIGHT", -5, 0)
@@ -73,7 +73,7 @@ function EvsHL.BuildCureTab(page)
         row.remove:SetScript("OnClick", function()
             S.dispel.spells[row.spell] = nil
             List()
-            EvsHL.ApplyVisuals()
+            HealLane.ApplyVisuals()
         end)
         rows[i] = row
     end
@@ -86,7 +86,7 @@ function EvsHL.BuildCureTab(page)
             if n then
                 row.spell = n
                 row.text:SetText(n)
-                row.icon:SetTexture(EvsHL.GetSpellTexture(n))
+                row.icon:SetTexture(HealLane.GetSpellTexture(n))
                 UpdateTypeDropdown(row)
                 row.remove:Show()
                 row:Show()
@@ -95,12 +95,12 @@ function EvsHL.BuildCureTab(page)
             end
         end
     end
-    EvsHL.AddConfigWidget(List)
+    HealLane.AddConfigWidget(List)
     local colorBox = H.Section(page, "Debuff type colors", -300, 116)
     for i, tName in ipairs(types) do
         local column = (i - 1) % 2
         local row = math.floor((i - 1) / 2)
         local colorKey = "debuff" .. tName .. "Color"
-        H.AddColor(colorBox, tName, 14 + column * 229, -30 - row * 28, colorKey, EvsHL.ApplyVisuals)
+        H.AddColor(colorBox, tName, 14 + column * 229, -30 - row * 28, colorKey, HealLane.ApplyVisuals)
     end
 end

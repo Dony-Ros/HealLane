@@ -1,7 +1,9 @@
 ## Interface: 16001, 20506, 50504, 120105
 ## Title: HealLane
 ## Author: Dony
-## Notes: nothing so far
+## Notes: A configurable Click Casting Party/Raid Frames for easy Healing.
+## OptionalDeps: HealLaneMod
 ## Version: 0.0.1
-## SavedVariablesPerCharacter: EVS_SetingsHealCharacter
+## SavedVariables: HealLaneProfileDB
+## SavedVariablesPerCharacter: HealLaneDB
 HealLane.xml

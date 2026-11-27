@@ -3,7 +3,7 @@
 -- Collects unit data from the game API or generates it for
 -- the simulation.
 -- ============================================================
-local EvsHL = EvsHL
+local HealLane = HealLane
 local SIM_NAMES = { "Awezon", "Aldrin", "Mirelle", "Torvald", "Selene", "Brokk", "Isolde", "Garrick", "Nyx", "Orin" }
 local SIM_CLASSES = { "DRUID", "PRIEST", "PALADIN", "SHAMAN", "WARRIOR", "MAGE", "ROGUE", "HUNTER", "WARLOCK","DEATHKNIGHT" }
 local SIM_MAX = { 1016, 850, 3400, 12400, 24000, 6200, 15800 }
@@ -11,8 +11,8 @@ local SIM_ICONS = { "Interface\\Icons\\Spell_Nature_Rejuvenation", "Interface\\I
     "Interface\\Icons\\Spell_Nature_ResistNature" }
 local SIM_DEBUFFS = { "Magic", "Curse", "Disease", "Poison", "Bleed", "Unknown" }
 local SIM_DEBUFF_ICON = "Interface\\Icons\\Spell_Shadow_ShadowWordPain"
-function EvsHL.SimData(btn)
-    local S = EvsHL.S
+function HealLane.SimData(btn)
+    local S = HealLane.S
     local i = btn.sim
     local now = GetTime()
     btn.name = SIM_NAMES[(i - 1) % #SIM_NAMES + 1]
@@ -36,7 +36,7 @@ function EvsHL.SimData(btn)
         local dt = now - btn.simLastUpdate
         btn.simLastUpdate = now
         -- Determine role priority for damage
-        local role = EvsHL.SimRole(i, EvsHL.simCount or 0)
+        local role = HealLane.SimRole(i, HealLane.simCount or 0)
         local damageMultiplier = 1.0
         if role == "TANK" then
             damageMultiplier = 3.5 -- Tank takes more damage
@@ -80,28 +80,28 @@ function EvsHL.SimData(btn)
     -- Simulated incoming cast
     btn.cast = (i % 3 == 0) and (btn.max * 0.2) or 0
 end
-function EvsHL.RealData(btn)
-    local S = EvsHL.S
+function HealLane.RealData(btn)
+    local S = HealLane.S
     local unit = btn.unit
     local now = GetTime()
     btn.health = UnitHealth(unit)
     btn.max = UnitHealthMax(unit)
     btn.online = UnitIsConnected(unit)
     btn.dead = UnitIsDeadOrGhost(unit)
-    if EvsHL.CanScanAuras() then
+    if HealLane.CanScanAuras() then
         btn.debuff = nil
         btn.debuffIconTexture = nil
         if S.debuffBorder or S.debuffIcon then
             local genericIcon
-            for i = 1, #EvsHL.buttons do
-                local name, _, icon, _, debuffType = EvsHL.GetAura(unit, i, "HARMFUL")
-                if EvsHL.IsSecretValue(name) then break end
+            for i = 1, #HealLane.buttons do
+                local name, _, icon, _, debuffType = HealLane.GetAura(unit, i, "HARMFUL")
+                if HealLane.IsSecretValue(name) then break end
                 if not name then break end
                 if not genericIcon then genericIcon = icon end
-                if not EvsHL.IsSecretValue(debuffType) and debuffType then
+                if not HealLane.IsSecretValue(debuffType) and debuffType then
                     for _, entry in pairs((S.dispel and S.dispel.spells) or {}) do
                         if entry.spell and entry.spell ~= "" and entry.types and entry.types[debuffType] then
-                            for _, knownSpell in ipairs(EvsHL.spells or {}) do
+                            for _, knownSpell in ipairs(HealLane.spells or {}) do
                                 if knownSpell.name == entry.spell then
                                     btn.debuff = debuffType
                                     btn.debuffIconTexture = icon
@@ -123,27 +123,27 @@ function EvsHL.RealData(btn)
         btn.trackedHots = nil
         local unitInCombat = UnitAffectingCombat and UnitAffectingCombat(unit)
         local canCheckCombat = S.checkBuffsInCombat
-            or (not EvsHL.IsSecretValue(unitInCombat) and not unitInCombat)
+            or (not HealLane.IsSecretValue(unitInCombat) and not unitInCombat)
         if S.monitorMissingBuffs and S.trackBuffs and next(S.trackBuffs) and not btn.isPet
             and UnitIsVisible(unit)
             and canCheckCombat then
             local buffs = {}
             local completeScan = true
-            for i = 1, #EvsHL.buttons do
-                local name, _, _, _, _, duration, expires, _, _, _, spellID = EvsHL.GetAura(unit, i, "HELPFUL")
-                if EvsHL.IsSecretValue(name) then
+            for i = 1, #HealLane.buttons do
+                local name, _, _, _, _, duration, expires, _, _, _, spellID = HealLane.GetAura(unit, i, "HELPFUL")
+                if HealLane.IsSecretValue(name) then
                     completeScan = false
                     break
                 end
                 if not name then break end
-                if not EvsHL.RecordBuffAura(buffs, name, spellID, duration, expires) then
+                if not HealLane.RecordBuffAura(buffs, name, spellID, duration, expires) then
                     completeScan = false
                     break
                 end
             end
             if completeScan then
                 for buffName, target in pairs(S.trackBuffs) do
-                    if EvsHL.BuffTargetMatches(btn, target) and EvsHL.BuffLacking(buffs, buffName) then
+                    if HealLane.BuffTargetMatches(btn, target) and HealLane.BuffLacking(buffs, buffName) then
                         btn.missingBuff = true
                         break
                     end
@@ -152,15 +152,15 @@ function EvsHL.RealData(btn)
         end
         btn.nh = 0
         if S.showHots or S.showIncoming then
-            for i = 1, #EvsHL.buttons do
-                local name, _, icon, _, _, duration, expires, caster, _, _, spellId = EvsHL.GetAura(unit, i, "HELPFUL")
-                if EvsHL.IsSecretValue(name) then break end
+            for i = 1, #HealLane.buttons do
+                local name, _, icon, _, _, duration, expires, caster, _, _, spellId = HealLane.GetAura(unit, i, "HELPFUL")
+                if HealLane.IsSecretValue(name) then break end
                 if not name then break end
-                local fromPlayer = not EvsHL.IsSecretValue(caster) and caster == "player"
-                if fromPlayer and S.hots[name] and spellId and EvsHL.LearnHotID(name, spellId) then
-                    EvsHL.RefreshNativeAuraFrames()
+                local fromPlayer = not HealLane.IsSecretValue(caster) and caster == "player"
+                if fromPlayer and S.hots[name] and spellId and HealLane.LearnHotID(name, spellId) then
+                    HealLane.RefreshNativeAuraFrames()
                 end
-                if fromPlayer and S.hots[name] and btn.nh < EvsHL.MAX_HOTS then
+                if fromPlayer and S.hots[name] and btn.nh < HealLane.MAX_HOTS then
                     btn.nh = btn.nh + 1
                     local h = btn.hots[btn.nh] or {}
                     btn.hots[btn.nh] = h
@@ -168,7 +168,7 @@ function EvsHL.RealData(btn)
                     h.icon = icon
                     h.duration = duration or 0
                     h.expires = expires or 0
-                    h.rate = EvsHL.HotRate(name)
+                    h.rate = HealLane.HotRate(name)
                 end
             end
         end
@@ -179,7 +179,7 @@ function EvsHL.RealData(btn)
         for i = 1, oldCount do
             local hot = btn.hots[i]
             local expires = hot and hot.expires
-            local active = hot and (EvsHL.IsSecretValue(expires)
+            local active = hot and (HealLane.IsSecretValue(expires)
                 or (type(expires) == "number" and expires > now))
             if active then
                 kept = kept + 1

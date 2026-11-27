@@ -1,7 +1,7 @@
-local EvsHL = EvsHL
-local H = EvsHL.ConfigHelpers
-function EvsHL.BuildDebuffsTab(page)
-    local S = EvsHL.S
+local HealLane = HealLane
+local H = HealLane.ConfigHelpers
+function HealLane.BuildDebuffsTab(page)
+    local S = HealLane.S
     local rows = {}
     local List
     local maxRows = 20
@@ -21,11 +21,11 @@ function EvsHL.BuildDebuffsTab(page)
             end
             S.ignoredDebuffs[entry.spellID] = { name = entry.name, icon = entry.icon }
             List()
-            EvsHL.ApplyVisuals()
+            HealLane.ApplyVisuals()
         end, true)
     end)
     local spellIDInput = CreateFrame("EditBox", nil, box, "InputBoxTemplate")
-    EvsHL.ConfigUI:StyleEditBox(spellIDInput)
+    HealLane.ConfigUI:StyleEditBox(spellIDInput)
     spellIDInput:SetAutoFocus(false)
     spellIDInput:SetWidth(110)
     spellIDInput:SetHeight(20)
@@ -44,12 +44,12 @@ function EvsHL.BuildDebuffsTab(page)
             DEFAULT_CHAT_FRAME:AddMessage("HealLane: The ignored debuff list is full (" .. maxRows .. ").")
             return
         end
-        local name = EvsHL.GetSpellInfo(spellID) or ("Spell " .. spellID)
-        S.ignoredDebuffs[spellID] = { name = name, icon = EvsHL.GetSpellTexture(spellID) }
+        local name = HealLane.GetSpellInfo(spellID) or ("Spell " .. spellID)
+        S.ignoredDebuffs[spellID] = { name = name, icon = HealLane.GetSpellTexture(spellID) }
         spellIDInput:SetText("")
         spellIDInput:ClearFocus()
         List()
-        EvsHL.ApplyVisuals()
+        HealLane.ApplyVisuals()
     end
     spellIDInput:SetScript("OnEnterPressed", AddSpellID)
     H.AddButton(box, "Ignore ID", 287, -42, 90, AddSpellID)
@@ -61,20 +61,20 @@ function EvsHL.BuildDebuffsTab(page)
         row.icon = row:CreateTexture(nil, "ARTWORK")
         row.icon:SetSize(18, 18)
         row.icon:SetPoint("LEFT")
-        row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        row.text = HealLane.CreateFontString(row, nil, "OVERLAY", "GameFontHighlight")
         row.text:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
         row.text:SetWidth(340)
         row.text:SetJustifyH("LEFT")
-        EvsHL.ConfigUI:StyleText(row.text)
+        HealLane.ConfigUI:StyleText(row.text)
         row.remove = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-        EvsHL.ConfigUI:StyleButton(row.remove)
+        HealLane.ConfigUI:StyleButton(row.remove)
         row.remove:SetSize(22, 20)
         row.remove:SetPoint("RIGHT", -5, 0)
         row.remove:SetText("X")
         row.remove:SetScript("OnClick", function()
             S.ignoredDebuffs[row.spellID] = nil
             List()
-            EvsHL.ApplyVisuals()
+            HealLane.ApplyVisuals()
         end)
         rows[i] = row
     end
@@ -89,9 +89,9 @@ function EvsHL.BuildDebuffsTab(page)
             if spellID then
                 local entry = S.ignoredDebuffs[spellID] or S.ignoredDebuffs[tostring(spellID)]
                 row.spellID = spellID
-                row.icon:SetTexture(type(entry) == "table" and entry.icon or EvsHL.GetSpellTexture(spellID))
+                row.icon:SetTexture(type(entry) == "table" and entry.icon or HealLane.GetSpellTexture(spellID))
                 local name = type(entry) == "table" and entry.name
-                row.text:SetText((name or EvsHL.GetSpellInfo(spellID) or ("Spell " .. spellID))
+                row.text:SetText((name or HealLane.GetSpellInfo(spellID) or ("Spell " .. spellID))
                     .. "  (" .. spellID .. ")")
                 row:Show()
             else
@@ -99,5 +99,5 @@ function EvsHL.BuildDebuffsTab(page)
             end
         end
     end
-    EvsHL.AddConfigWidget(List)
+    HealLane.AddConfigWidget(List)
 end

@@ -1,15 +1,15 @@
 -- Combat-safe native AuraContainer integration (HoTs + dispel icons).
-local EvsHL = EvsHL
-local S = nil  -- lazily pulled from EvsHL.S
-local nativeAuraWarnings = EvsHL.nativeAuraWarnings
-function EvsHL.WarnNativeAura(key, message)
+local HealLane = HealLane
+local S = nil  -- lazily pulled from HealLane.S
+local nativeAuraWarnings = HealLane.nativeAuraWarnings
+function HealLane.WarnNativeAura(key, message)
     if nativeAuraWarnings[key] then return end
     nativeAuraWarnings[key] = true
     if DEFAULT_CHAT_FRAME then
         DEFAULT_CHAT_FRAME:AddMessage("HealLane: " .. message)
     end
 end
-function EvsHL.ProbeNativeAuraSupport()
+function HealLane.ProbeNativeAuraSupport()
     if not (AuraUtil and AuraUtil.IsValidFilterString) then return false end
     local ok, container = pcall(CreateFrame, "AuraContainer", nil, UIParent, "CustomAuraContainerTemplate")
     if not ok or not container or type(container.AddAuraSlot) ~= "function"
@@ -22,19 +22,19 @@ function EvsHL.ProbeNativeAuraSupport()
     return true
 end
 local NATIVE_DISPEL_TYPES = { "Magic", "Curse", "Disease", "Poison", "Bleed" }
-function EvsHL.GetDispelColor(typeName)
-    local S = EvsHL.S
-    local c = S and S[EvsHL.DEBUFF_COLOR_KEYS[typeName]]
+function HealLane.GetDispelColor(typeName)
+    local S = HealLane.S
+    local c = S and S[HealLane.DEBUFF_COLOR_KEYS[typeName]]
     if c then return c end
-    local f = EvsHL.DEBUFF_TYPE_COLORS[typeName] or { r = 1, g = 0, b = 0 }
+    local f = HealLane.DEBUFF_TYPE_COLORS[typeName] or { r = 1, g = 0, b = 0 }
     return { f.r, f.g, f.b }
 end
 
 local AddAuraSlot, ApplyHoTFlowLayout, BuildDispelSlotOptions, BuildHoTGroupOptions, BuildSingleDispelSlot, InitializeAuraIcon, InitializeAuraIconDuration, InitializeAuraIconTexture
 local function GetNativeAuraSelection()
-    local curS = EvsHL.S
+    local curS = HealLane.S
     local knownSpells = {}
-    for _, spell in ipairs(EvsHL.spells or {}) do
+    for _, spell in ipairs(HealLane.spells or {}) do
         knownSpells[spell.name] = spell
     end
     local hotEntries, seenIDs = {}, {}
@@ -59,11 +59,11 @@ local function GetNativeAuraSelection()
             for id in pairs(idSet) do idList[#idList + 1] = id end
             table.sort(idList)
             if #idList > 0 then
-                if #hotEntries < EvsHL.MAX_HOTS then
+                if #hotEntries < HealLane.MAX_HOTS then
                     hotEntries[#hotEntries + 1] = { name = name, spellIDs = idList }
                 end
             else
-                EvsHL.WarnNativeAura("hot-spell-id",
+                HealLane.WarnNativeAura("hot-spell-id",
                     "a selected HoT has no spell ID on this client and cannot be shown by the combat-safe aura display.")
             end
         end
@@ -91,7 +91,7 @@ local function GetNativeAuraSelection()
     end
     for _, dispelType in ipairs(dispelTypes) do
         signature[#signature + 1] = "d" .. dispelType
-        local color = EvsHL.GetDispelColor(dispelType)
+        local color = HealLane.GetDispelColor(dispelType)
         signature[#signature + 1] = "c" .. dispelType .. ":" .. tostring(color[1]) .. ","
             .. tostring(color[2]) .. "," .. tostring(color[3]) .. ":" .. tostring(curS.barAlpha)
     end
@@ -122,7 +122,7 @@ end
 local function CreateHoTDurationOptions()
     if not (C_StringUtil and C_StringUtil.CreateNumericRuleFormatter
         and Enum and Enum.NumericRuleFormatRounding) then
-        EvsHL.WarnNativeAura("duration-format", "number-only HoT duration text is not supported by this client.")
+        HealLane.WarnNativeAura("duration-format", "number-only HoT duration text is not supported by this client.")
         return nil
     end
     local ok, formatter = pcall(function()
@@ -137,7 +137,7 @@ local function CreateHoTDurationOptions()
         return numeric
     end)
     if not ok or not formatter then
-        EvsHL.WarnNativeAura("duration-format", "could not create the number-only HoT duration formatter.")
+        HealLane.WarnNativeAura("duration-format", "could not create the number-only HoT duration formatter.")
         return nil
     end
     if C_AuraContainerUtil
@@ -150,7 +150,7 @@ local function CreateHoTDurationOptions()
                 binding:SetEnabled(true)
             end)
             if configured then return { binding = binding } end
-            EvsHL.WarnNativeAura("duration-format", "could not configure HoT duration text: " .. tostring(err))
+            HealLane.WarnNativeAura("duration-format", "could not configure HoT duration text: " .. tostring(err))
         end
     end
     return { formatter = formatter }
@@ -170,19 +170,19 @@ local function RetireNativeAuraContainer(btn)
     btn.nativeAurasActive = false
 end
 local function BuildHoTGroup(btn, container, hotEntries)
-    local curS = EvsHL.S
+    local curS = HealLane.S
 
     local sortMethods = _G.AuraContainerSortMethod
     local sortDirections = _G.AuraContainerSortDirection
     if not (sortMethods and sortMethods.AuraInstanceIDOnly
         and sortDirections and sortDirections.Normal) then
-        EvsHL.WarnNativeAura("hot-sort", "this client cannot sort HoT icons by application order.")
+        HealLane.WarnNativeAura("hot-sort", "this client cannot sort HoT icons by application order.")
         RetireNativeAuraContainer(btn)
         return false
     end
 
     if not AuraUtil.IsValidFilterString("HELPFUL|PLAYER") then
-        EvsHL.WarnNativeAura("filter", "the native aura display rejected the HoT filter.")
+        HealLane.WarnNativeAura("filter", "the native aura display rejected the HoT filter.")
         RetireNativeAuraContainer(btn)
         return false
     end
@@ -192,7 +192,7 @@ local function BuildHoTGroup(btn, container, hotEntries)
 
     local success, err = pcall(container.AddAuraGroup, container, "heallane-hots", "HELPFUL|PLAYER", options)
     if not success then
-        EvsHL.WarnNativeAura("hot-group", "could not register the HoT aura group: " .. tostring(err))
+        HealLane.WarnNativeAura("hot-group", "could not register the HoT aura group: " .. tostring(err))
         RetireNativeAuraContainer(btn)
         return false
     end
@@ -242,7 +242,7 @@ local function BuildDispelSlots(btn, container, dispelTypes, ignoredSpellIDs)
     return true
 end
 BuildSingleDispelSlot = function(btn, container, index, typeName, dispelCount, ignoredSpellIDs)
-    local curS = EvsHL.S
+    local curS = HealLane.S
     local options = BuildDispelSlotOptions(btn, index, typeName, dispelCount, curS, ignoredSpellIDs)
 
     local success = AddAuraSlot(container, "heallane-dispel-" .. typeName, "HARMFUL", options)
@@ -253,7 +253,7 @@ end
 local function EnableNativeAuraContainer(btn, container)
     local enabled, err = pcall(container.SetEnabled, container, true)
     if not enabled then
-        EvsHL.WarnNativeAura("enable", "could not enable the combat-safe aura display: " .. tostring(err))
+        HealLane.WarnNativeAura("enable", "could not enable the combat-safe aura display: " .. tostring(err))
         RetireNativeAuraContainer(btn)
         return false
     end
@@ -274,8 +274,8 @@ BuildDispelSlotOptions = function(btn, index, typeName, dispelCount, curS, ignor
                 local tint = created:CreateTexture(nil, "BACKGROUND")
                 tint:SetPoint("TOPLEFT", fill, "TOPLEFT")
                 tint:SetPoint("BOTTOMRIGHT", fill, "BOTTOMRIGHT")
-                local c = EvsHL.GetDispelColor(typeName)
-                EvsHL.SetTextureColor(tint, c[1], c[2], c[3], curS.barAlpha)
+                local c = HealLane.GetDispelColor(typeName)
+                HealLane.SetTextureColor(tint, c[1], c[2], c[3], curS.barAlpha)
                 created.healLaneTint = true
             end)
         end,
@@ -309,13 +309,13 @@ ApplyHoTFlowLayout = function(container, curS, hotCount)
 end
 AddAuraSlot = function(container, key, filter, options)
     if not AuraUtil.IsValidFilterString(filter) then
-        EvsHL.WarnNativeAura("filter", "the native aura display rejected a filter; combat aura updates are unavailable.")
+        HealLane.WarnNativeAura("filter", "the native aura display rejected a filter; combat aura updates are unavailable.")
         return false
     end
 
     local added, slot = pcall(container.AddAuraSlot, container, key, filter, options)
     if not added or not slot then
-        EvsHL.WarnNativeAura("slot", "could not register an aura filter; combat aura updates are unavailable: "
+        HealLane.WarnNativeAura("slot", "could not register an aura filter; combat aura updates are unavailable: "
             .. tostring(slot))
         return false
     end
@@ -356,20 +356,20 @@ InitializeAuraIconDuration = function(button, size)
     local durationOptions = CreateHoTDurationOptions()
     if not durationOptions then return end
 
-    local durationText = button:CreateFontString(nil, "OVERLAY")
+    local durationText = HealLane.CreateFontString(button, nil, "OVERLAY")
     durationText:SetPoint("CENTER", button, "CENTER", 0, 0)
-    durationText:SetFont(EvsHL.FONT, math.max(7, math.floor(size * 0.55)), "OUTLINE")
+    durationText:SetFont(HealLane.FONT, math.max(7, math.floor(size * 0.55)), "OUTLINE")
 
     local ok, err = pcall(button.SetDurationText, button, durationText, durationOptions)
     if not ok then
-        EvsHL.WarnNativeAura("duration-format", "could not attach HoT duration text: " .. tostring(err))
+        HealLane.WarnNativeAura("duration-format", "could not attach HoT duration text: " .. tostring(err))
     end
     button.healLaneDurationText = durationText
 end
 local function CreateNativeAuraContainer(btn)
     local ok, container = pcall(CreateFrame, "AuraContainer", nil, btn, "CustomAuraContainerTemplate")
     if not ok or not container then
-        EvsHL.WarnNativeAura("create", "could not create the combat-safe aura display; combat aura updates are unavailable.")
+        HealLane.WarnNativeAura("create", "could not create the combat-safe aura display; combat aura updates are unavailable.")
         return nil
     end
 
@@ -384,7 +384,7 @@ local function CreateNativeAuraContainer(btn)
 
     local bound, bindError = pcall(container.SetUnit, container, btn.unit)
     if not bound then
-        EvsHL.WarnNativeAura("unit", "could not bind the combat-safe aura display to a unit: " .. tostring(bindError))
+        HealLane.WarnNativeAura("unit", "could not bind the combat-safe aura display to a unit: " .. tostring(bindError))
         RetireNativeAuraContainer(btn)
         return nil
     end
@@ -419,7 +419,7 @@ local function BuildNativeAuraContainer(btn, signature, hotEntries, dispelTypes,
     return true
 end
 local function RefreshNativeAuraFrame(btn)
-    if not EvsHL.nativeAuraSupported or InCombatLockdown() then return end
+    if not HealLane.nativeAuraSupported or InCombatLockdown() then return end
     local unit = btn.unit
     local active = unit and not btn.sim and btn:IsShown()
     if not active then
@@ -443,7 +443,7 @@ local function RefreshNativeAuraFrame(btn)
     if btn.nativeAuraUnit ~= unit then
         local ok, err = pcall(container.SetUnit, container, unit)
         if not ok then
-            EvsHL.WarnNativeAura("unit", "could not bind the combat-safe aura display to a unit: " .. tostring(err))
+            HealLane.WarnNativeAura("unit", "could not bind the combat-safe aura display to a unit: " .. tostring(err))
             pcall(container.SetEnabled, container, false)
             if btn.nativeDispelActive then wipe(btn.nativeDispelActive) end
             btn.nativeAurasActive = false
@@ -453,7 +453,7 @@ local function RefreshNativeAuraFrame(btn)
     end
     local ok, err = pcall(container.SetEnabled, container, true)
     if not ok then
-        EvsHL.WarnNativeAura("enable", "could not enable the combat-safe aura display: " .. tostring(err))
+        HealLane.WarnNativeAura("enable", "could not enable the combat-safe aura display: " .. tostring(err))
         pcall(container.SetEnabled, container, false)
         if btn.nativeDispelActive then wipe(btn.nativeDispelActive) end
         btn.nativeAurasActive = false
@@ -462,9 +462,9 @@ local function RefreshNativeAuraFrame(btn)
     container:Show()
     btn.nativeAurasActive = true
 end
-function EvsHL.RefreshNativeAuraFrames()
-    if not EvsHL.nativeAuraSupported or InCombatLockdown() then return end
-    for _, btn in pairs(EvsHL.buttons) do
+function HealLane.RefreshNativeAuraFrames()
+    if not HealLane.nativeAuraSupported or InCombatLockdown() then return end
+    for _, btn in pairs(HealLane.buttons) do
         RefreshNativeAuraFrame(btn)
     end
 end

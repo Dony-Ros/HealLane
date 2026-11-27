@@ -1,7 +1,7 @@
 -- Role detection, role icons, and the Shift+wheel role menu.
-local EvsHL = EvsHL
+local HealLane = HealLane
 local function NormalizeRole(role)
-    if type(role) ~= "string" or EvsHL.IsSecretValue(role) then return nil end
+    if type(role) ~= "string" or HealLane.IsSecretValue(role) then return nil end
     role = string.upper(role)
     if role == "TANK" or role == "MAINTANK" then return "TANK" end
     if role == "HEALER" then return "HEALER" end
@@ -14,9 +14,9 @@ local function AssignedRole(unit)
         if ok then
             local normalized = NormalizeRole(role)
             if normalized then return normalized end
-            if role == true and not EvsHL.IsSecretValue(role) then return "TANK" end
-            if isHeal == true and not EvsHL.IsSecretValue(isHeal) then return "HEALER" end
-            if isDPS == true and not EvsHL.IsSecretValue(isDPS) then return "DAMAGER" end
+            if role == true and not HealLane.IsSecretValue(role) then return "TANK" end
+            if isHeal == true and not HealLane.IsSecretValue(isHeal) then return "HEALER" end
+            if isDPS == true and not HealLane.IsSecretValue(isDPS) then return "DAMAGER" end
         end
     end
     local raidIndex = tonumber(unit:match("^raid(%d+)$"))
@@ -50,9 +50,9 @@ local function AssignedRole(unit)
     end
 end
 local function UnitRole(unit)
-    local S = EvsHL.S
+    local S = HealLane.S
     local guid = UnitGUID and UnitGUID(unit)
-    if EvsHL.IsSecretValue(guid) or type(guid) ~= "string" then guid = nil end
+    if HealLane.IsSecretValue(guid) or type(guid) ~= "string" then guid = nil end
     local override = guid and S and S.roleOverrides and S.roleOverrides[guid]
     if override == "TANK" or override == "HEALER" then return override end
     local role = AssignedRole(unit)
@@ -80,30 +80,30 @@ local function SimRole(i, count)
     return "DPS"
 end
 -- Expose to other modules
-EvsHL.UnitRole     = UnitRole
-EvsHL.IsTank       = IsTank
-EvsHL.IsHeal       = IsHeal
-EvsHL.IsDPS        = IsDPS
-EvsHL.RolePriority = RolePriority
-EvsHL.SimRole      = SimRole
-EvsHL.AssignedRole = AssignedRole
-EvsHL.Role_Icons = {
+HealLane.UnitRole     = UnitRole
+HealLane.IsTank       = IsTank
+HealLane.IsHeal       = IsHeal
+HealLane.IsDPS        = IsDPS
+HealLane.RolePriority = RolePriority
+HealLane.SimRole      = SimRole
+HealLane.AssignedRole = AssignedRole
+HealLane.Role_Icons = {
     ["TANK"]   = [[Interface\Addons\HealLane\Textures\role\1\tank.tga]],
     ["HEALER"] = [[Interface\Addons\HealLane\Textures\role\1\healer.tga]],
     ["DPS"]    = [[Interface\Addons\HealLane\Textures\role\1\dps.tga]],
     ["CUSTOM"] = [[Interface\Addons\HealLane\Textures\role\1\dps.tga]],
 }
 local function IsGrouped()
-    return EvsHL.NumRaid() > 0 or EvsHL.NumParty() > 0
+    return HealLane.NumRaid() > 0 or HealLane.NumParty() > 0
 end
-function EvsHL.UpdateUnitRoleIcon(btn)
-    local S = EvsHL.S
+function HealLane.UpdateUnitRoleIcon(btn)
+    local S = HealLane.S
     if btn.sim then
-        local role = EvsHL.SimRole(btn.sim, EvsHL.simCount or 0)
+        local role = HealLane.SimRole(btn.sim, HealLane.simCount or 0)
         if role == "PLAYER" then role = "HEALER" end
         btn.role = role
-        if S.showRoleIcon and EvsHL.Role_Icons[role] then
-            btn.roleIcon:SetTexture(EvsHL.Role_Icons[role])
+        if S.showRoleIcon and HealLane.Role_Icons[role] then
+            btn.roleIcon:SetTexture(HealLane.Role_Icons[role])
             btn.roleIcon:Show()
         else
             btn.roleIcon:Hide()
@@ -120,13 +120,13 @@ function EvsHL.UpdateUnitRoleIcon(btn)
     end
     if btn.role then
         btn.roleIcon:Show()
-        btn.roleIcon:SetTexture(EvsHL.Role_Icons[btn.role])
+        btn.roleIcon:SetTexture(HealLane.Role_Icons[btn.role])
     else
         btn.roleIcon:Hide()
     end
 end
 -- Configurable role-menu bindings -----------------------------
-local roleMenuFrame = CreateFrame("Frame", "EvsHLRoleMenu", UIParent, "UIDropDownMenuTemplate")
+local roleMenuFrame = CreateFrame("Frame", "HealLaneRoleMenu", UIParent, "UIDropDownMenuTemplate")
 local roleMenuClickSlots = {
     LeftButton = 1,
     RightButton = 2,
@@ -134,8 +134,8 @@ local roleMenuClickSlots = {
     Button4 = 4,
     Button5 = 5,
 }
-function EvsHL.IsRoleMenuBinding(slot)
-    local S = EvsHL.S
+function HealLane.IsRoleMenuBinding(slot)
+    local S = HealLane.S
     if not S or not S.clicks then return false end
     local ctrl = IsControlKeyDown()
     local alt = IsAltKeyDown()
@@ -160,16 +160,16 @@ function EvsHL.IsRoleMenuBinding(slot)
     end
     return S.clicks[prefix .. slot] == "a:role"
 end
-function EvsHL.IsRoleMenuClick(button)
+function HealLane.IsRoleMenuClick(button)
     local slot = roleMenuClickSlots[button]
-    return slot and EvsHL.IsRoleMenuBinding(slot) or false
+    return slot and HealLane.IsRoleMenuBinding(slot) or false
 end
-function EvsHL.ShowRoleMenu(btn)
-    local S = EvsHL.S
+function HealLane.ShowRoleMenu(btn)
+    local S = HealLane.S
     local unit = btn.unit
     if not unit or btn.sim then return end
     local guid = UnitGUID and UnitGUID(unit)
-    if EvsHL.IsSecretValue(guid) or type(guid) ~= "string" then guid = nil end
+    if HealLane.IsSecretValue(guid) or type(guid) ~= "string" then guid = nil end
     local manualRole = guid and S.roleOverrides and S.roleOverrides[guid]
     UIDropDownMenu_Initialize(roleMenuFrame, function(self, level)
         local tankInfo = UIDropDownMenu_CreateInfo()
@@ -182,10 +182,10 @@ function EvsHL.ShowRoleMenu(btn)
                 else
                     S.roleOverrides[guid] = "TANK"
                 end
-                btn.role = EvsHL.UnitRole(unit)
-                EvsHL.UpdateUnitRoleIcon(btn)
-                EvsHL.MarkOrderDirty()
-                EvsHL.Refresh()
+                btn.role = HealLane.UnitRole(unit)
+                HealLane.UpdateUnitRoleIcon(btn)
+                HealLane.MarkOrderDirty()
+                HealLane.Refresh()
             end
         end
         UIDropDownMenu_AddButton(tankInfo, level)
@@ -199,10 +199,10 @@ function EvsHL.ShowRoleMenu(btn)
                 else
                     S.roleOverrides[guid] = "HEALER"
                 end
-                btn.role = EvsHL.UnitRole(unit)
-                EvsHL.UpdateUnitRoleIcon(btn)
-                EvsHL.MarkOrderDirty()
-                EvsHL.Refresh()
+                btn.role = HealLane.UnitRole(unit)
+                HealLane.UpdateUnitRoleIcon(btn)
+                HealLane.MarkOrderDirty()
+                HealLane.Refresh()
             end
         end
         UIDropDownMenu_AddButton(healerInfo, level)

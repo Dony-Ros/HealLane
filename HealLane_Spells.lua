@@ -1,8 +1,8 @@
 -- Spellbook scanning, tooltip parsing, HoT rate estimation, and incoming heal tracking.
-local EvsHL = EvsHL
-local scanTip = CreateFrame("GameTooltip", "EvsHLScanTip", nil, "GameTooltipTemplate")
+local HealLane = HealLane
+local scanTip = CreateFrame("GameTooltip", "HealLaneScanTip", nil, "GameTooltipTemplate")
 local function FindSpell(name)
-    for _, e in ipairs(EvsHL.spells or {}) do
+    for _, e in ipairs(HealLane.spells or {}) do
         if e.name == name then return e end
     end
 end
@@ -19,7 +19,7 @@ local function HealAmount(spell)
     if not entry or not entry.helpful then return end
     Tooltip(entry)
     for i = 2, scanTip:NumLines() do
-        local fs = _G["EvsHLScanTipTextLeft" .. i]
+        local fs = _G["HealLaneScanTipTextLeft" .. i]
         local text = fs and fs:GetText()
         if text and text:lower():find("heal") then
             text = text:gsub(",", "")
@@ -44,7 +44,7 @@ local function HotInfo(spell)
     if entry then
         Tooltip(entry)
         for i = 2, scanTip:NumLines() do
-            local fs = _G["EvsHLScanTipTextLeft" .. i]
+            local fs = _G["HealLaneScanTipTextLeft" .. i]
             local text = fs and fs:GetText()
             if text then
                 text = text:gsub(",", "")
@@ -85,19 +85,19 @@ end
 local function SpellBookLearnLevel(slot, bank, spellID)
     if C_SpellBook and C_SpellBook.GetSpellBookItemLevelLearned then
         local ok, level = pcall(C_SpellBook.GetSpellBookItemLevelLearned, slot, bank)
-        if ok and not EvsHL.IsSecretValue(level) and type(level) == "number" and level > 0 then
+        if ok and not HealLane.IsSecretValue(level) and type(level) == "number" and level > 0 then
             return level
         end
     end
     if spellID and C_Spell and C_Spell.GetSpellLevelLearned then
         local ok, level = pcall(C_Spell.GetSpellLevelLearned, spellID)
-        if ok and not EvsHL.IsSecretValue(level) and type(level) == "number" and level > 0 then
+        if ok and not HealLane.IsSecretValue(level) and type(level) == "number" and level > 0 then
             return level
         end
     end
     if spellID and GetSpellLevelLearned then
         local ok, level = pcall(GetSpellLevelLearned, spellID)
-        if ok and not EvsHL.IsSecretValue(level) and type(level) == "number" and level > 0 then
+        if ok and not HealLane.IsSecretValue(level) and type(level) == "number" and level > 0 then
             return level
         end
     end
@@ -127,8 +127,8 @@ local function SpellBookInfo(slot, bank, spellID, name, rank, rankCounts, missin
     end
     return name, rank, rankNumber, learnedLevel
 end
-function EvsHL.LearnHotID(name, spellID)
-    local S = EvsHL.S
+function HealLane.LearnHotID(name, spellID)
+    local S = HealLane.S
     if not S or type(spellID) ~= "number" then return false end
     S.hotIDs = S.hotIDs or {}
     local ids = S.hotIDs[name]
@@ -137,7 +137,7 @@ function EvsHL.LearnHotID(name, spellID)
         S.hotIDs[name] = ids
     end
     if ids[spellID] then return false end
-    for _, entry in ipairs(EvsHL.spells or {}) do
+    for _, entry in ipairs(HealLane.spells or {}) do
         if entry.name == name and entry.spellIDs and entry.spellIDs[spellID] then
             return false
         end
@@ -146,18 +146,18 @@ function EvsHL.LearnHotID(name, spellID)
     return true
 end
 
-EvsHL.FindSpell = FindSpell
-EvsHL.HealAmount = HealAmount
-EvsHL.HotRate = HotRate
-EvsHL.HotDuration = HotDuration
-function EvsHL.PrepareHotPredictions()
+HealLane.FindSpell = FindSpell
+HealLane.HealAmount = HealAmount
+HealLane.HotRate = HotRate
+HealLane.HotDuration = HotDuration
+function HealLane.PrepareHotPredictions()
     if InCombatLockdown and InCombatLockdown() then return end
-    local S = EvsHL.S
+    local S = HealLane.S
     for name, enabled in pairs((S and S.hots) or {}) do
         if enabled then HotInfo(name) end
     end
 end
-function EvsHL.ScanSpells()
+function HealLane.ScanSpells()
     local list, seen = {}, {}
     local rankCounts = {}
     local missingRanks = {}
@@ -173,7 +173,7 @@ function EvsHL.ScanSpells()
                     local item = C_SpellBook.GetSpellBookItemInfo(slot, bank)
                     local spellID = item and item.spellID
                     if spellID then
-                        local name, rank = EvsHL.GetSpellInfo(spellID)
+                        local name, rank = HealLane.GetSpellInfo(spellID)
                         local passive = C_Spell and C_Spell.IsSpellPassive and C_Spell.IsSpellPassive(spellID)
                         if name and not passive then
                             local rankNumber, learnedLevel
@@ -194,7 +194,7 @@ function EvsHL.ScanSpells()
                                 if helpful == nil then helpful = true end
                                 entry = {
                                     name = name,
-                                    icon = EvsHL.GetSpellTexture(spellID),
+                                    icon = HealLane.GetSpellTexture(spellID),
                                     helpful = helpful,
                                     kind = "spell",
                                     index = slot,
@@ -234,7 +234,7 @@ function EvsHL.ScanSpells()
                     else
                         entry = {
                             name = name,
-                            icon = EvsHL.GetSpellTexture(i),
+                            icon = HealLane.GetSpellTexture(i),
                             helpful = IsHelpfulSpell and IsHelpfulSpell(i, "spell") or false,
                             kind = "spell",
                             index = i,
@@ -260,28 +260,28 @@ function EvsHL.ScanSpells()
         end
     end
     table.sort(list, function(a, b) return a.name < b.name end)
-    EvsHL.spells = list
+    HealLane.spells = list
     if not InCombatLockdown or not InCombatLockdown() then
         hotInfoCache = {}
     end
-    local S = EvsHL.S
+    local S = HealLane.S
     if S then
         for name in pairs(seen) do
-            if EvsHL.KNOWN_HOTS[name] and not S.hotsSeen[name] then
+            if HealLane.KNOWN_HOTS[name] and not S.hotsSeen[name] then
                 S.hotsSeen[name] = true
                 S.hots[name] = true
             end
         end
     end
-    if EvsHL.PrepareHotPredictions then EvsHL.PrepareHotPredictions() end
-    if EvsHL.SyncConfig then EvsHL.SyncConfig() end
-    EvsHL.ApplyVisuals()
+    if HealLane.PrepareHotPredictions then HealLane.PrepareHotPredictions() end
+    if HealLane.SyncConfig then HealLane.SyncConfig() end
+    HealLane.ApplyVisuals()
 end
 -- ============================================================
 -- Incoming-heal tracking (cast events)
 -- ============================================================
-function EvsHL.ClearIncoming(spell)
-    for _, btn in pairs(EvsHL.buttons) do
+function HealLane.ClearIncoming(spell)
+    for _, btn in pairs(HealLane.buttons) do
         if not spell or btn.incomingSpell == spell then
             btn.incoming = nil
             btn.incomingSpell = nil
@@ -289,33 +289,33 @@ function EvsHL.ClearIncoming(spell)
         end
     end
 end
-function EvsHL.SpellNameFromCastEvent(value, spellID)
+function HealLane.SpellNameFromCastEvent(value, spellID)
     if type(spellID) == "number" then
-        return EvsHL.GetSpellInfo(spellID) or tostring(spellID)
+        return HealLane.GetSpellInfo(spellID) or tostring(spellID)
     end
     return value
 end
 local function FindButtonForTarget(target, targetUnit)
-    if type(targetUnit) == "string" and not EvsHL.IsSecretValue(targetUnit) then
-        for _, btn in pairs(EvsHL.buttons) do
+    if type(targetUnit) == "string" and not HealLane.IsSecretValue(targetUnit) then
+        for _, btn in pairs(HealLane.buttons) do
             if btn.unit and not btn.sim
                 and (btn.unit == targetUnit or (UnitExists(targetUnit) and UnitIsUnit(btn.unit, targetUnit))) then
                 return btn
             end
         end
     end
-    if type(target) ~= "string" or EvsHL.IsSecretValue(target) then return nil end
-    for _, btn in pairs(EvsHL.buttons) do
+    if type(target) ~= "string" or HealLane.IsSecretValue(target) then return nil end
+    for _, btn in pairs(HealLane.buttons) do
         if btn.unit and not btn.sim and UnitExists(target) and UnitIsUnit(btn.unit, target) then
             return btn
         end
     end
 
     local nameMatches = {}
-    for _, btn in pairs(EvsHL.buttons) do
+    for _, btn in pairs(HealLane.buttons) do
         if btn.unit and not btn.sim then
             local name, realm = UnitName(btn.unit)
-            if not EvsHL.IsSecretValue(name) and not EvsHL.IsSecretValue(realm) then
+            if not HealLane.IsSecretValue(name) and not HealLane.IsSecretValue(realm) then
                 local fullName = name and realm and realm ~= "" and (name .. "-" .. realm) or name
                 if target == fullName then
                     return btn
@@ -327,10 +327,10 @@ local function FindButtonForTarget(target, targetUnit)
     end
     if #nameMatches == 1 then return nameMatches[1] end
 end
-function EvsHL.TrackHotCast(target, spell, targetUnit)
-    local S = EvsHL.S
+function HealLane.TrackHotCast(target, spell, targetUnit)
+    local S = HealLane.S
     if not S or not S.showIncoming or type(spell) ~= "string"
-        or EvsHL.IsSecretValue(spell) or not S.hots or not S.hots[spell] then
+        or HealLane.IsSecretValue(spell) or not S.hots or not S.hots[spell] then
         return
     end
     local rate, duration = HotInfo(spell)
@@ -345,11 +345,11 @@ function EvsHL.TrackHotCast(target, spell, targetUnit)
         name = spell,
     }
 end
-function EvsHL.StartIncoming(spell)
-    local S = EvsHL.S
+function HealLane.StartIncoming(spell)
+    local S = HealLane.S
     if not S then return end
     if not S.showIncoming then return end
-    local pendingCast = EvsHL.pendingCast
+    local pendingCast = HealLane.pendingCast
     if not pendingCast or pendingCast.spell ~= spell then return end
     local amount = HealAmount(spell)
     if not amount then return end
@@ -363,6 +363,6 @@ function EvsHL.StartIncoming(spell)
         matchedButton.incomingEnd = endTime and endTime / 1000
     end
     if not (S.hots and S.hots[spell]) then
-        EvsHL.pendingCast = nil
+        HealLane.pendingCast = nil
     end
 end

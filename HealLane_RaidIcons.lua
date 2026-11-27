@@ -1,7 +1,7 @@
 -- Raid target marker textures and unit-button updates.
-local EvsHL = EvsHL
+local HealLane = HealLane
 
-EvsHL.Raid_Textures = {
+HealLane.Raid_Textures = {
     [1] = [[Interface\Addons\HealLane\Textures\raid\1\Star.tga]],
     [2] = [[Interface\Addons\HealLane\Textures\raid\1\Circle.tga]],
     [3] = [[Interface\Addons\HealLane\Textures\raid\1\Diamond.tga]],
@@ -12,9 +12,9 @@ EvsHL.Raid_Textures = {
     [8] = [[Interface\Addons\HealLane\Textures\raid\1\Skull.tga]],
 }
 
-function EvsHL.UpdateUnitRaidIcon(btn)
+function HealLane.UpdateUnitRaidIcon(btn)
     local icon = btn.raidTargetIcon
-    local S = EvsHL.S
+    local S = HealLane.S
     if btn.sim or not btn.unit or not S or not S.showRaidIcon or not GetRaidTargetIndex then
         icon:Hide()
         return
@@ -26,7 +26,7 @@ function EvsHL.UpdateUnitRaidIcon(btn)
         return
     end
 
-    if EvsHL.IsSecretValue(iconIndex) then
+    if HealLane.IsSecretValue(iconIndex) then
         if not SetRaidTargetIconTexture then
             icon:Hide()
             return
@@ -37,7 +37,7 @@ function EvsHL.UpdateUnitRaidIcon(btn)
         return
     end
 
-    local texture = type(iconIndex) == "number" and EvsHL.Raid_Textures[iconIndex]
+    local texture = type(iconIndex) == "number" and HealLane.Raid_Textures[iconIndex]
     if not texture then
         icon:Hide()
         return
@@ -48,11 +48,11 @@ function EvsHL.UpdateUnitRaidIcon(btn)
     icon:Show()
 end
 
-function EvsHL.QueueUpdateUnitRaidIcons()
-    for i = 1, #EvsHL.buttons do
-        local btn = EvsHL.buttons[i]
+function HealLane.QueueUpdateUnitRaidIcons()
+    for i = 1, #HealLane.buttons do
+        local btn = HealLane.buttons[i]
         if btn and btn:IsShown() and btn.unit then
-            EvsHL.UpdateUnitRaidIcon(btn)
+            HealLane.UpdateUnitRaidIcon(btn)
         end
     end
 end

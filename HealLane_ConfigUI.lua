@@ -1,6 +1,6 @@
-local EvsHL = _G.EvsHL
+local HealLane = _G.HealLane
 local ConfigUI = {}
-EvsHL.ConfigUI = ConfigUI
+HealLane.ConfigUI = ConfigUI
 
 local DEFAULT_COLORS = {
     bg = { 0.09, 0.09, 0.10 },
@@ -21,6 +21,18 @@ end
 function ConfigUI:GetColors()
     local addon = _G.HealLaneMod or _G.GameUtility
     return addon and addon.colors or DEFAULT_COLORS
+end
+
+function ConfigUI:WrapText(fontString, width)
+    local library = self:GetLibrary()
+    if library and library.WrapTextToWidth then
+        return library:WrapTextToWidth(fontString, width)
+    end
+    if fontString then
+        fontString:SetWidth(width)
+        if fontString.SetWordWrap then fontString:SetWordWrap(true) end
+    end
+    return fontString
 end
 
 function ConfigUI:CreateBackdropFrame(frameType, name, parent, template)
@@ -56,7 +68,7 @@ function ConfigUI:CreateIconButton(parent, width, height, onClick)
     button.icon:SetSize(iconSize, iconSize)
     button.icon:SetPoint("LEFT", 5, 0)
     button.icon:SetDrawLayer("OVERLAY")
-    button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    button.text = HealLane.CreateFontString(button, nil, "OVERLAY", "GameFontHighlight")
     button.text:SetPoint("LEFT", button.icon, "RIGHT", 8, 0)
     button.text:SetPoint("RIGHT", -6, 0)
     button.text:SetJustifyH("LEFT")
@@ -239,6 +251,9 @@ function ConfigUI:SetTabSelected(button, selected)
 end
 
 function ConfigUI:StyleButton(button)
+    if button and button.GetFontString then
+        HealLane.ApplyPixelPerfectFontString(button:GetFontString())
+    end
     local library = self:GetLibrary()
     if library and library.StyleButton then
         library:StyleButton(button, self:GetColors())
@@ -260,6 +275,7 @@ function ConfigUI:StylePanel(panel, background)
 end
 
 function ConfigUI:StyleText(fontString, color)
+    HealLane.ApplyPixelPerfectFontString(fontString)
     local library = self:GetLibrary()
     if library and library.StyleText then
         library:StyleText(fontString, self:GetColors(), color)

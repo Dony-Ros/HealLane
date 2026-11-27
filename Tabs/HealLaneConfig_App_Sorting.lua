@@ -1,28 +1,28 @@
-local EvsHL = EvsHL
+local HealLane = HealLane
 local FLAT = "Interface\\Buttons\\WHITE8x8"
 local CHIP_W, CHIP_H, GAP, PAD = 58, 48, 4, 3
 local TRACK_W, TRACK_H = 436, 58
 local KEYS = { "TANK", "PLAYER", "HEALER", "DPS", "PETS", "TARGET", "BREAK" }
 local CHIPS = {
-    TANK = { label = "Tank", color = { 0.35, 0.55, 1 }, texture = EvsHL.Role_Icons.TANK, tip = "Tanks" },
+    TANK = { label = "Tank", color = { 0.35, 0.55, 1 }, texture = HealLane.Role_Icons.TANK, tip = "Tanks" },
     PLAYER = { label = "You", color = { 1, 0.82, 0.2 }, portrait = true, tip = "Your own frame" },
-    HEALER = { label = "Healer", color = { 0.3, 0.9, 0.4 }, texture = EvsHL.Role_Icons.HEALER, tip = "Healers" },
-    DPS = { label = "DPS", color = { 0.95, 0.35, 0.35 }, texture = EvsHL.Role_Icons.DPS, tip = "Damage dealers and everyone else" },
+    HEALER = { label = "Healer", color = { 0.3, 0.9, 0.4 }, texture = HealLane.Role_Icons.HEALER, tip = "Healers" },
+    DPS = { label = "DPS", color = { 0.95, 0.35, 0.35 }, texture = HealLane.Role_Icons.DPS, tip = "Damage dealers and everyone else" },
     PETS = { label = "Pets", color = { 0.75, 0.55, 0.3 }, texture = "Interface\\Icons\\Ability_Hunter_MendPet", coords = { 0.08, 0.92, 0.08, 0.92 }, tip = "Pet frames" },
     TARGET = { label = "Target", color = { 0.7, 0.7, 0.7 }, texture = "Interface\\Icons\\Ability_Marksmanship", coords = { 0.08, 0.92, 0.08, 0.92 }, tip = "Temporary target frame" },
     BREAK = { label = "Break", color = { 1, 0.82, 0 }, tip = "Column break", desc = "Everything before it stacks in the first column. Everything after it fills the remaining columns." },
 }
 local SAMPLE = { TANK = 2, PLAYER = 1, HEALER = 3, DPS = 8, PETS = 2, TARGET = 1 }
 
-function EvsHL.BuildAppSorting(page)
-    local H = EvsHL.ConfigHelpers
+function HealLane.BuildAppSorting(page)
+    local H = HealLane.ConfigHelpers
     local chips, order = {}, {}
     local dragging, dragIndex
     local RefreshPreview
 
     local function Apply()
-        EvsHL.MarkOrderDirty()
-        EvsHL.Refresh()
+        HealLane.MarkOrderDirty()
+        HealLane.Refresh()
         RefreshPreview()
     end
 
@@ -34,7 +34,7 @@ function EvsHL.BuildAppSorting(page)
     track:SetWidth(TRACK_W) track:SetHeight(TRACK_H) track:SetPoint("TOPLEFT", 12, -92)
     track:SetBackdrop({ bgFile = FLAT })
     track:SetBackdropColor(0, 0, 0, 0.35)
-    EvsHL.ConfigUI:StylePanel(track, EvsHL.ConfigUI:GetColors().panel)
+    HealLane.ConfigUI:StylePanel(track, HealLane.ConfigUI:GetColors().panel)
     local slotTex = track:CreateTexture(nil, "BACKGROUND")
     slotTex:SetWidth(CHIP_W) slotTex:SetHeight(CHIP_H)
     slotTex:SetTexture(FLAT) slotTex:SetVertexColor(1, 1, 1, 0.12)
@@ -89,7 +89,7 @@ function EvsHL.BuildAppSorting(page)
             end
             local key = table.remove(order, from)
             table.insert(order, math.min(dragIndex, #order + 1), key)
-            EvsHL.SetSortOrder(order)
+            HealLane.SetSortOrder(order)
             Apply()
         end
         Layout()
@@ -102,16 +102,16 @@ function EvsHL.BuildAppSorting(page)
         chip:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
         chip:SetBackdropColor(0, 0, 0, 0.7)
         chip:SetBackdropBorderColor(def.color[1], def.color[2], def.color[3], 1)
-        EvsHL.ConfigUI:StyleButton(chip)
+        HealLane.ConfigUI:StyleButton(chip)
         chip:SetHighlightTexture(FLAT) chip:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.12)
         chip.icon = chip:CreateTexture(nil, "ARTWORK")
         chip.icon:SetWidth(24) chip.icon:SetHeight(24) chip.icon:SetPoint("TOP", 0, -6)
         chip.icon:SetDrawLayer("OVERLAY")
         chip.icon:SetVertexColor(1, 1, 1, 1)
         chip.icon:SetAlpha(1)
-        chip.label = chip:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        chip.label = HealLane.CreateFontString(chip, nil, "OVERLAY", "GameFontHighlightSmall")
         chip.label:SetPoint("BOTTOM", 0, 6) chip.label:SetText(def.label)
-        EvsHL.ConfigUI:StyleText(chip.label)
+        HealLane.ConfigUI:StyleText(chip.label)
         if key == "BREAK" then
             chip.icon:SetTexture(FLAT)
             chip.icon:SetVertexColor(def.color[1], def.color[2], def.color[3])
@@ -152,18 +152,18 @@ function EvsHL.BuildAppSorting(page)
 
     local function LoadChips()
         EndDrag(false)
-        order = EvsHL.GetSortOrder()
+        order = HealLane.GetSortOrder()
         SetPortraitTexture(chips.PLAYER.icon, "player")
         Layout()
     end
 
     local optionsBox = H.Section(page, "Options", -170, 122)
-    H.Field(optionsBox, "Within each role", 20, -30, 140, EvsHL.SORT_WITHIN_OPTIONS,
-        function() return EvsHL.GetSortWithin() end,
-        function(v) EvsHL.S.sortWithin = v Apply() end)
-    H.Field(optionsBox, "Fill direction", 250, -30, 140, EvsHL.SORT_FILL_OPTIONS,
-        function() return EvsHL.GetSortFill() end,
-        function(v) EvsHL.S.sortFill = v Apply() end)
+    H.Field(optionsBox, "Within each role", 20, -30, 140, HealLane.SORT_WITHIN_OPTIONS,
+        function() return HealLane.GetSortWithin() end,
+        function(v) HealLane.S.sortWithin = v Apply() end)
+    H.Field(optionsBox, "Fill direction", 250, -30, 140, HealLane.SORT_FILL_OPTIONS,
+        function() return HealLane.GetSortFill() end,
+        function(v) HealLane.S.sortFill = v Apply() end)
     H.AddCheck(optionsBox, "Reverse order within roles", 8, -84, "sortReverse", Apply)
 
     local previewBox = H.Section(page, "Preview", -300, 140)
@@ -179,14 +179,14 @@ function EvsHL.BuildAppSorting(page)
             swatch:SetPoint("TOPLEFT", 300, -30 - legendY * 16)
             swatch:SetTexture(FLAT)
             swatch:SetVertexColor(def.color[1], def.color[2], def.color[3])
-            local fs = previewBox:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            local fs = HealLane.CreateFontString(previewBox, nil, "OVERLAY", "GameFontHighlightSmall")
             fs:SetPoint("LEFT", swatch, "RIGHT", 6, 0)
             fs:SetText(def.label .. " x" .. SAMPLE[key])
             legendY = legendY + 1
         end
     end
     RefreshPreview = function()
-        local S = EvsHL.S
+        local S = HealLane.S
         for _, cell in ipairs(cells) do cell:Hide() end
         if not S.sortByRole then
             offNote:Show()
@@ -194,7 +194,7 @@ function EvsHL.BuildAppSorting(page)
         end
         offNote:Hide()
         local cols = math.max(tonumber(S.cols) or 1, 1)
-        local sorted, positions, rowCount = EvsHL.SortPreview(SAMPLE, cols)
+        local sorted, positions, rowCount = HealLane.SortPreview(SAMPLE, cols)
         local pitch = math.max(math.min(12, math.floor(100 / rowCount)), 4)
         for i, cat in ipairs(sorted) do
             local cell = cells[i]
@@ -213,9 +213,9 @@ function EvsHL.BuildAppSorting(page)
     end
 
     H.AddButton(page, "Reset sorting", 0, 0, 140, function()
-        EvsHL.ResetSorting()
+        HealLane.ResetSorting()
         Apply()
-        EvsHL.SyncConfig()
+        HealLane.SyncConfig()
     end, "BOTTOMLEFT", nil, 15, 15)
 
     local function Reload()
@@ -223,6 +223,6 @@ function EvsHL.BuildAppSorting(page)
         RefreshPreview()
     end
     page:SetScript("OnShow", Reload)
-    EvsHL.AddConfigWidget(Reload)
+    HealLane.AddConfigWidget(Reload)
     Reload()
 end

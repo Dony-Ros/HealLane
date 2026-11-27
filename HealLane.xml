@@ -3,7 +3,7 @@
   xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
   <!-- Shared constants must load first. -->
   <Script file="HealLane_Constants.lua" />
-  <!-- Core: EvsHL namespace, helpers, saved vars, event frame. -->
+  <!-- Core: HealLane namespace, helpers, saved vars, event frame. -->
   <Script file="HealLane.lua" />
   <!-- Feature modules (order matters only for the module-level hooks they export). -->
   <Script file="HealLane_Roles.lua" />
@@ -27,6 +27,7 @@
   <Script file="Tabs/HealLaneConfig_App_Bars.lua" />
   <Script file="Tabs/HealLaneConfig_App_Icons.lua" />
   <Script file="Tabs/HealLaneConfig_App_Sorting.lua" />
+  <Script file="Tabs/HealLaneConfig_Profiles.lua" />
   <Script file="Tabs/HealLaneConfig_Clicks.lua" />
   <Script file="Tabs/HealLaneConfig.lua" />
   <Script file="Tabs/HealLaneConfig_Cure.lua" />

@@ -1,9 +1,9 @@
 -- Parent frame, drag handle, unit button creation, and visuals application.
-local EvsHL = EvsHL
+local HealLane = HealLane
 -- ============================================================
 -- Parent frame + drag handle
 -- ============================================================
-local parentFrame = EvsHL.CreateBackdropFrame("Frame", "EvsUnitButtonFrame", UIParent)
+local parentFrame = HealLane.CreateBackdropFrame("Frame", "EvsUnitButtonFrame", UIParent)
 parentFrame:SetWidth(150)
 parentFrame:SetHeight(50)
 parentFrame:SetPoint("CENTER")
@@ -11,9 +11,9 @@ parentFrame:SetMovable(true)
 parentFrame:SetClampedToScreen(true)
 parentFrame:EnableMouse(true)
 parentFrame:RegisterForDrag("LeftButton")
-EvsHL.parentFrame = parentFrame
+HealLane.parentFrame = parentFrame
 parentFrame:SetScript("OnDragStart", function(self)
-    local S = EvsHL.S
+    local S = HealLane.S
     if not S or S.locked then
         return
     end
@@ -25,21 +25,21 @@ end)
 parentFrame:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
     local p, _, rp, x, y = self:GetPoint()
-    local S = EvsHL.S
+    local S = HealLane.S
     if S then
         S.pos = {p, rp, x, y}
     end
 end)
 local handle = CreateFrame("Button", nil, parentFrame)
 handle:SetHeight(14)
-handle:SetPoint("BOTTOMLEFT", parentFrame, "BOTTOMLEFT", EvsHL.OUTER, 2)
-handle:SetPoint("BOTTOMRIGHT", parentFrame, "BOTTOMRIGHT", -EvsHL.OUTER, 2)
+handle:SetPoint("BOTTOMLEFT", parentFrame, "BOTTOMLEFT", HealLane.OUTER, 2)
+handle:SetPoint("BOTTOMRIGHT", parentFrame, "BOTTOMRIGHT", -HealLane.OUTER, 2)
 handle:RegisterForClicks("LeftButtonUp")
 handle:RegisterForDrag("LeftButton")
-local handleText = handle:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+local handleText = HealLane.CreateFontString(handle, nil, "OVERLAY", "GameFontNormalSmall")
 handleText:SetPoint("CENTER")
 handleText:SetText("Options")
-EvsHL.handleText = handleText
+HealLane.handleText = handleText
 handle:SetScript("OnMouseDown", function(self)
     self.moved = false
 end)
@@ -53,7 +53,7 @@ end)
 handle:SetScript("OnDragStop", function()
     parentFrame:StopMovingOrSizing()
     local p, _, rp, x, y = parentFrame:GetPoint()
-    local S = EvsHL.S
+    local S = HealLane.S
     if S then
         S.pos = {p, rp, x, y}
     end
@@ -63,12 +63,12 @@ handle:SetScript("OnClick", function(self)
         self.moved = false
         return
     end
-    if EvsHL.ToggleConfig then
-        EvsHL.ToggleConfig()
+    if HealLane.ToggleConfig then
+        HealLane.ToggleConfig()
     end
 end)
-function EvsHL.ApplyPosition()
-    local S = EvsHL.S
+function HealLane.ApplyPosition()
+    local S = HealLane.S
     parentFrame:ClearAllPoints()
     if S and S.pos then
         parentFrame:SetPoint(S.pos[1], UIParent, S.pos[2], S.pos[3], S.pos[4])
@@ -101,51 +101,52 @@ local function LayoutResourceBar(btn, S)
     bar:SetHeight(S.resourceBarHeight or 4)
     bar:SetPoint(anchor, btn, anchor, S.resourceBarOffsetX or 0, S.resourceBarOffsetY or 2)
 end
-local function ApplyTextFont(fontString, font, size, flags, shadow)
+local function ApplyTextFont(fontString, font, size, flags, shadow, shadowColor, shadowOffsetX, shadowOffsetY)
     fontString:SetFont(font, size, flags)
-    fontString:SetShadowColor(0, 0, 0, shadow and 1 or 0)
+    shadowColor = shadowColor or { 0, 0, 0 }
+    fontString:SetShadowColor(shadowColor[1], shadowColor[2], shadowColor[3], shadow and 1 or 0)
     if shadow then
-        fontString:SetShadowOffset(1, -1)
+        fontString:SetShadowOffset(shadowOffsetX or 1, shadowOffsetY or -1)
     else
         fontString:SetShadowOffset(0, 0)
     end
 end
-function EvsHL.ApplyVisuals()
-    local S = EvsHL.S
+function HealLane.ApplyVisuals()
+    local S = HealLane.S
     if not S then
         return
     end
     if InCombatLockdown() then
         return
     end
-    if EvsHL.PrepareHotPredictions then
-        EvsHL.PrepareHotPredictions()
+    if HealLane.PrepareHotPredictions then
+        HealLane.PrepareHotPredictions()
     end
-    EvsHL.RefreshNativeAuraFrames()
-    EvsHL.healthAlphaCurve = nil
-    EvsHL.healthColorCurves = nil
+    HealLane.RefreshNativeAuraFrames()
+    HealLane.healthAlphaCurve = nil
+    HealLane.healthColorCurves = nil
     if C_CurveUtil and C_CurveUtil.CreateCurve and Enum and Enum.LuaCurveType and Enum.LuaCurveType.Linear then
         local curve = C_CurveUtil.CreateCurve()
         curve:SetType(Enum.LuaCurveType.Linear)
         curve:AddPoint(0, S.barAlpha)
         curve:AddPoint(1, S.barAlphaFull)
-        EvsHL.healthAlphaCurve = curve
+        HealLane.healthAlphaCurve = curve
         if S.lowHealthColor then
-            local colors = {S.thresholdColor or EvsHL.DEFAULTS.thresholdColor, S.barColor or EvsHL.DEFAULTS.barColor}
-            EvsHL.healthColorCurves = {}
+            local colors = {S.thresholdColor or HealLane.DEFAULTS.thresholdColor, S.barColor or HealLane.DEFAULTS.barColor}
+            HealLane.healthColorCurves = {}
             for channel = 1, 3 do
                 local colorCurve = C_CurveUtil.CreateCurve()
                 colorCurve:SetType(Enum.LuaCurveType.Linear)
                 colorCurve:AddPoint(0, colors[1][channel])
                 colorCurve:AddPoint(1, colors[2][channel])
-                EvsHL.healthColorCurves[channel] = colorCurve
+                HealLane.healthColorCurves[channel] = colorCurve
             end
         end
     end
     parentFrame:SetScale(S.scale)
     if S.showBorder then
         parentFrame:SetBackdrop({
-            bgFile = EvsHL.FLAT,
+            bgFile = HealLane.FLAT,
             edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
             edgeSize = 12,
             insets = {
@@ -158,7 +159,7 @@ function EvsHL.ApplyVisuals()
         parentFrame:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
     else
         parentFrame:SetBackdrop({
-            bgFile = EvsHL.FLAT
+            bgFile = HealLane.FLAT
         })
     end
     parentFrame:SetBackdropColor(0, 0, 0, S.bgAlpha)
@@ -167,27 +168,65 @@ function EvsHL.ApplyVisuals()
     else
         handle:Show()
     end
-    EvsHL.ver = (EvsHL.ver or 0) + 1
+    HealLane.ver = (HealLane.ver or 0) + 1
     if not S.showIncoming then
-        EvsHL.pendingCast = nil
+        HealLane.pendingCast = nil
     end
-    local fontSize = tonumber(S.fontSize) or EvsHL.DEFAULTS.fontSize
-    local font = S.fontFace or EvsHL.DEFAULTS.fontFace
-    local fontFlags = S.fontOutline or EvsHL.DEFAULTS.fontOutline
+    local fontSize = tonumber(S.fontSize) or HealLane.DEFAULTS.fontSize
+    local font = S.fontFace or HealLane.DEFAULTS.fontFace
+    local fontFlags = S.fontOutline or HealLane.DEFAULTS.fontOutline
     if S.fontMonochrome then
         fontFlags = fontFlags ~= "" and (fontFlags .. ",MONOCHROME") or "MONOCHROME"
     end
     if fontFlags == "" then fontFlags = nil end
-    for _, btn in pairs(EvsHL.buttons) do
-        ApplyTextFont(btn.font, font, fontSize, fontFlags, S.fontShadow)
-        ApplyTextFont(btn.hpText, font, fontSize, fontFlags, S.fontShadow)
+    for _, btn in pairs(HealLane.buttons) do
+        local nameSize = tonumber(S.nameFontSize) or 0
+        if nameSize <= 0 then nameSize = fontSize end
+        local nameFont = S.nameFontFace
+        if type(nameFont) ~= "string" or nameFont == "" then nameFont = font end
+        local nameFlags = S.nameFontOutline
+        if nameFlags == nil or nameFlags == "" or nameFlags == "inherit" then nameFlags = fontFlags end
+        if S.fontMonochrome and nameFlags and nameFlags ~= "" then nameFlags = nameFlags .. ",MONOCHROME" end
+        if nameFlags == "" then nameFlags = nil end
+        local nameShadowMode = S.nameShadow or "inherit"
+        local nameShadow = nameShadowMode
+        if nameShadowMode == "inherit" then
+            nameShadow = S.fontShadow
+        elseif nameShadowMode == "enable" then
+            nameShadow = true
+        elseif nameShadowMode == "disable" then
+            nameShadow = false
+        end
+        local nameShadowColor = nameShadowMode == "inherit" and S.fontShadowColor or S.nameShadowColor
+        local nameShadowOffsetX = nameShadowMode == "inherit" and S.fontShadowOffsetX or S.nameShadowOffsetX
+        local nameShadowOffsetY = nameShadowMode == "inherit" and S.fontShadowOffsetY or S.nameShadowOffsetY
+        ApplyTextFont(btn.font, nameFont, nameSize, nameFlags, nameShadow,
+            nameShadowColor, nameShadowOffsetX, nameShadowOffsetY)
+        btn.font:SetJustifyH(S.nameJustifyH or "CENTER")
+        local healthSize = tonumber(S.healthFontSize) or 0
+        if healthSize <= 0 then healthSize = fontSize end
+        local healthFont = S.healthFontFace
+        if type(healthFont) ~= "string" or healthFont == "" then healthFont = font end
+        local healthFlags = S.healthFontOutline
+        if healthFlags == nil or healthFlags == "inherit" then healthFlags = fontFlags end
+        if S.fontMonochrome and healthFlags and healthFlags ~= "" then healthFlags = healthFlags .. ",MONOCHROME" end
+        if healthFlags == "" then healthFlags = nil end
+        local healthShadow = S.healthShadow or "inherit"
+        if healthShadow == "inherit" then healthShadow = S.fontShadow
+        elseif healthShadow == "enable" then healthShadow = true
+        elseif healthShadow == "disable" then healthShadow = false
+        end
+        ApplyTextFont(btn.hpText, healthFont, healthSize, healthFlags, healthShadow,
+            S.healthShadowColor or S.fontShadowColor,
+            S.healthShadowOffsetX or S.fontShadowOffsetX,
+            S.healthShadowOffsetY or S.fontShadowOffsetY)
         if not S.showIncoming then
             btn.incoming = nil
             btn.incomingSpell = nil
             btn.incomingEnd = nil
         end
         btn.healthBar.bg:SetVertexColor(0.08, 0.08, 0.08, S.btnAlpha)
-        EvsHL.LayoutHealPrediction(btn)
+        HealLane.LayoutHealPrediction(btn)
         LayoutResourceBar(btn, S)
         btn.roleIcon:SetWidth(20 * (S.roleIconScale or 1))
         btn.roleIcon:SetHeight(20 * (S.roleIconScale or 1))
@@ -228,7 +267,7 @@ end
 -- ============================================================
 -- Unit menu (right-click)
 -- ============================================================
-local menuFrame = CreateFrame("Frame", "EvsHLUnitMenu", UIParent, "UIDropDownMenuTemplate")
+local menuFrame = CreateFrame("Frame", "HealLaneUnitMenu", UIParent, "UIDropDownMenuTemplate")
 local function ShowUnitMenu(btn)
     local unit = btn.unit
     if not unit or btn.sim then
@@ -256,13 +295,13 @@ local function ShowUnitMenu(btn)
     end, "MENU")
     ToggleDropDownMenu(1, nil, menuFrame, "cursor")
 end
-EvsHL.ShowUnitMenu = ShowUnitMenu
+HealLane.ShowUnitMenu = ShowUnitMenu
 -- ============================================================
 -- Unit button creation
 -- ============================================================
 local function UpdateTargetOutline(btn)
     if not btn or not btn.hover then return end
-    local S = EvsHL.S
+    local S = HealLane.S
     local color = S and S.hoverColor or { 1, 1, 1 }
     btn.hover:SetBackdropBorderColor(color[1], color[2], color[3], 1)
     local isTarget = not btn.sim and btn.unit and UnitExists("target")
@@ -273,30 +312,30 @@ local function UpdateTargetOutline(btn)
         btn.hover:Hide()
     end
 end
-EvsHL.UpdateTargetOutline = function()
-    for _, btn in pairs(EvsHL.buttons) do
+HealLane.UpdateTargetOutline = function()
+    for _, btn in pairs(HealLane.buttons) do
         UpdateTargetOutline(btn)
     end
 end
-function EvsHL.CreateUnitButton(index)
+function HealLane.CreateUnitButton(index)
     local btn = CreateFrame("Button", "PartyHealButton" .. index, parentFrame, "HealLaneUnitButtonTemplate")
     btn:SetAttribute("useOnKeyDown", false)
     btn:RegisterForClicks("AnyUp")
     btn:EnableMouseWheel(true)
     btn:SetScript("OnMouseWheel", function(self, delta)
         local slot = delta > 0 and 6 or delta < 0 and 7
-        if slot and EvsHL.IsRoleMenuBinding(slot) then
-            EvsHL.ShowRoleMenu(self)
+        if slot and HealLane.IsRoleMenuBinding(slot) then
+            HealLane.ShowRoleMenu(self)
         end
     end)
     btn.hots = {}
     btn.menu = ShowUnitMenu
     -- Hook Secure Action Click for Smart Casting
-    btn:HookScript("PreClick", EvsHL.SmartCast_PreClick)
-    btn:HookScript("PostClick", EvsHL.SmartCast_PostClick)
+    btn:HookScript("PreClick", HealLane.SmartCast_PreClick)
+    btn:HookScript("PostClick", HealLane.SmartCast_PostClick)
     btn:HookScript("PostClick", function(self, button)
-        if EvsHL.IsRoleMenuClick(button) then
-            EvsHL.ShowRoleMenu(self)
+        if HealLane.IsRoleMenuClick(button) then
+            HealLane.ShowRoleMenu(self)
         end
     end)
     local predClip = CreateFrame("Frame", nil, btn)
@@ -306,7 +345,7 @@ function EvsHL.CreateUnitButton(index)
     predClip:EnableMouse(false)
     local pred = CreateFrame("StatusBar", nil, predClip)
     pred:SetFrameLevel(predClip:GetFrameLevel() + 1)
-    pred:SetStatusBarTexture(EvsHL.FLAT)
+    pred:SetStatusBarTexture(HealLane.FLAT)
     pred:SetMinMaxValues(0, 1)
     pred:SetValue(0)
     pred:Hide()
@@ -324,16 +363,16 @@ function EvsHL.CreateUnitButton(index)
     btn.raidTargetIcon:Hide()
     local resourceBar = CreateFrame("StatusBar", nil, btn)
     resourceBar:SetFrameLevel(btn.healthBar:GetFrameLevel() + 4)
-    resourceBar:SetStatusBarTexture(EvsHL.FLAT)
+    resourceBar:SetStatusBarTexture(HealLane.FLAT)
     resourceBar:SetMinMaxValues(0, 1)
     resourceBar:SetValue(0)
     resourceBar.background = resourceBar:CreateTexture(nil, "BACKGROUND")
     resourceBar.background:SetAllPoints(resourceBar)
-    resourceBar.background:SetTexture(EvsHL.FLAT)
+    resourceBar.background:SetTexture(HealLane.FLAT)
     resourceBar.background:SetVertexColor(0, 0, 0, 0.85)
     resourceBar:Hide()
     btn.resourceBar = resourceBar
-    LayoutResourceBar(btn, EvsHL.S or EvsHL.DEFAULTS)
+    LayoutResourceBar(btn, HealLane.S or HealLane.DEFAULTS)
     local textLayer = CreateFrame("Frame", nil, btn)
     textLayer:SetAllPoints(btn)
     textLayer:SetFrameLevel(btn:GetFrameLevel() + 20)
@@ -341,34 +380,31 @@ function EvsHL.CreateUnitButton(index)
     btn.textLayer = textLayer
     for _, region in ipairs({btn.font, btn.hpText, btn.roleIcon, btn.raidTargetIcon}) do
         region:SetParent(textLayer)
-        if region.SetShadowOffset then
-            region:SetShadowOffset(1, -1)
-        end
     end
-    local debuff = EvsHL.CreateBackdropFrame("Frame", nil, btn)
+    local debuff = HealLane.CreateBackdropFrame("Frame", nil, btn)
     debuff:SetAllPoints(btn)
     debuff:SetBackdrop({
-        edgeFile = EvsHL.FLAT,
+        edgeFile = HealLane.FLAT,
         edgeSize = 1
     })
     debuff:Hide()
     btn.debuffBorder = debuff
-    local aggro = EvsHL.CreateBackdropFrame("Frame", nil, btn)
+    local aggro = HealLane.CreateBackdropFrame("Frame", nil, btn)
     aggro:SetAllPoints(btn)
     aggro:SetFrameLevel(btn:GetFrameLevel() + 5)
     aggro:SetBackdrop({
-        edgeFile = EvsHL.FLAT,
+        edgeFile = HealLane.FLAT,
         edgeSize = 2
     })
     aggro:SetBackdropBorderColor(1, 0, 0, 1)
     aggro:Hide()
     btn.aggro = aggro
-    local buff = EvsHL.CreateBackdropFrame("Frame", nil, btn)
+    local buff = HealLane.CreateBackdropFrame("Frame", nil, btn)
     buff:SetAllPoints(btn)
     buff:SetFrameLevel(btn:GetFrameLevel() + 10)
     buff:EnableMouse(false)
     buff:SetBackdrop({
-        edgeFile = EvsHL.FLAT,
+        edgeFile = HealLane.FLAT,
         edgeSize = 2
     })
     buff:Hide()
@@ -382,24 +418,24 @@ function EvsHL.CreateUnitButton(index)
     btn.debuffIconTex:SetAllPoints(debuffIcon)
     local iconBg = debuffIcon:CreateTexture(nil, "BACKGROUND")
     iconBg:SetAllPoints(debuffIcon)
-    EvsHL.SetTextureColor(iconBg, 0, 0, 0, 1)
+    HealLane.SetTextureColor(iconBg, 0, 0, 0, 1)
     debuffIcon:Hide()
     btn.debuffIcon = debuffIcon
-    local hover = EvsHL.CreateBackdropFrame("Frame", nil, btn)
+    local hover = HealLane.CreateBackdropFrame("Frame", nil, btn)
     hover:SetAllPoints(btn)
     hover:SetBackdrop({
-        edgeFile = EvsHL.FLAT,
+        edgeFile = HealLane.FLAT,
         edgeSize = 2
     })
     hover:Hide()
     btn.hover = hover
     btn.hotIcons, btn.hotTexts = {}, {}
-    for i = 1, EvsHL.MAX_HOTS do
+    for i = 1, HealLane.MAX_HOTS do
         local icon = btn.healthBar:CreateTexture(nil, "OVERLAY")
         icon:Hide()
         btn.hotIcons[i] = icon
-        local txt = btn:CreateFontString(nil, "OVERLAY")
-        txt:SetFont(EvsHL.FONT, 9, "OUTLINE")
+        local txt = HealLane.CreateFontString(btn, nil, "OVERLAY")
+        txt:SetFont(HealLane.FONT, 9, "OUTLINE")
         txt:SetPoint("CENTER", icon, "CENTER", 0, 0)
         txt:Hide()
         btn.hotTexts[i] = txt
@@ -407,7 +443,7 @@ function EvsHL.CreateUnitButton(index)
     btn:SetScript("OnEnter", function(self)
         self.mouseHovered = true
         UpdateTargetOutline(self)
-        local S = EvsHL.S
+        local S = HealLane.S
         if S and S.showTooltip and UnitFrame_OnEnter and self.unit and not self.sim then
             UnitFrame_OnEnter(self)
         end
@@ -415,14 +451,14 @@ function EvsHL.CreateUnitButton(index)
     btn:SetScript("OnLeave", function(self)
         self.mouseHovered = false
         UpdateTargetOutline(self)
-        local S = EvsHL.S
+        local S = HealLane.S
         if S and S.showTooltip and UnitFrame_OnLeave and not self.sim then
             UnitFrame_OnLeave(self)
         end
     end)
     if index == 1 then
         btn:HookScript("PostClick", function(self, button)
-            local S = EvsHL.S
+            local S = HealLane.S
             if S.showTempTarget and not InCombatLockdown() and self.unit == "player" then
                 if UnitExists("target") and UnitIsFriend("player", "target") then
                     -- hook kept for parity; no-op
@@ -430,7 +466,7 @@ function EvsHL.CreateUnitButton(index)
             end
         end)
     end
-    EvsHL.buttons[index] = btn
+    HealLane.buttons[index] = btn
     return btn
 end
 -- Called from the XML OnLoad of HealLaneUnitButtonTemplate
@@ -446,4 +482,6 @@ function HealLane_UnitButton_OnLoad(self)
     assert(self.font, "HealLane unit button is missing its name font string")
     self.hpText = _G[name .. "HealthBarHp"]
     assert(self.hpText, "HealLane unit button is missing its health font string")
+    HealLane.ApplyPixelPerfectFontString(self.font)
+    HealLane.ApplyPixelPerfectFontString(self.hpText)
 end

@@ -1,6 +1,6 @@
 -- Party chat role icons: puts a small tank / healer / DPS icon before the
 -- sender's name in party (and instance) chat lines.
-local EvsHL = EvsHL
+local HealLane = HealLane
 
 local ICONS = {
     TANK = "|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:14:14:0:0:64:64:0:19:22:41|t",
@@ -9,10 +9,10 @@ local ICONS = {
 }
 
 local function UnitRole(unit)
-    if EvsHL.IsTank and EvsHL.IsTank(unit) then
+    if HealLane.IsTank and HealLane.IsTank(unit) then
         return "TANK"
     end
-    if EvsHL.IsHeal and EvsHL.IsHeal(unit) then
+    if HealLane.IsHeal and HealLane.IsHeal(unit) then
         return "HEALER"
     end
     local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit)
@@ -36,7 +36,7 @@ local function RoleOfName(linkName)
         if UnitExists(unit) then
             local name = UnitName(unit)
             local full = GetUnitName and GetUnitName(unit, true)
-            if not EvsHL.IsSecretValue(name) and not EvsHL.IsSecretValue(full) then
+            if not HealLane.IsSecretValue(name) and not HealLane.IsSecretValue(full) then
                 if name == linkName or full == linkName then
                     return UnitRole(unit)
                 end
@@ -46,9 +46,9 @@ local function RoleOfName(linkName)
 end
 
 local function Decorate(text)
-    local S = EvsHL.S
+    local S = HealLane.S
     if not (S and S.chatRoleIcons) then return text end
-    if type(text) ~= "string" or EvsHL.IsSecretValue(text) then return text end
+    if type(text) ~= "string" or HealLane.IsSecretValue(text) then return text end
 
     local start, _, name = text:find("|Hplayer:([^:|]+)")
     if not start then return text end
