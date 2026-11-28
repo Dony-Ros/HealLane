@@ -52,9 +52,10 @@ function HealLane.CanScanAuras()
 end
 function HealLane.GetAura(unit, index, filter)
     if not HealLane.CanScanAuras() then return nil end
+    if type(unit) ~= "string" or HealLane.IsSecretValue(unit) then return nil end
     if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-        local aura = C_UnitAuras.GetAuraDataByIndex(unit, index, filter)
-        if not aura then return nil end
+        local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, unit, index, filter)
+        if not ok or not aura or HealLane.IsSecretValue(aura.name) then return nil end
         return aura.name, nil, aura.icon, aura.applications, aura.dispelName,
             aura.duration, aura.expirationTime, aura.sourceUnit, aura.isStealable,
             aura.nameplateShowPersonal, aura.spellId, aura.canApplyAura,
@@ -62,7 +63,15 @@ function HealLane.GetAura(unit, index, filter)
             aura.timeMod, aura.points
     end
     local getAura = filter == "HARMFUL" and (UnitDebuff or UnitAura) or (UnitBuff or UnitAura)
-    if getAura then return getAura(unit, index, filter) end
+    if getAura then
+        local ok, name, rank, icon, count, debuffType, duration, expirationTime,
+            sourceUnit, isStealable, nameplateShowPersonal, spellId, canApplyAura,
+            isBossAura, isFromPlayerOrPlayerPet, nameplateShowAll, timeMod, points = pcall(getAura, unit, index, filter)
+        if not ok or HealLane.IsSecretValue(name) then return nil end
+        return name, rank, icon, count, debuffType, duration, expirationTime,
+            sourceUnit, isStealable, nameplateShowPersonal, spellId, canApplyAura,
+            isBossAura, isFromPlayerOrPlayerPet, nameplateShowAll, timeMod, points
+    end
 end
 function HealLane.NumParty()
     if GetNumSubgroupMembers then return GetNumSubgroupMembers() end
@@ -434,6 +443,22 @@ end
 
 function HealLane.SetSimulation(count)
     HealLane.simCount = count or 0
+    if HealLane.simCount == 0 then
+        for _, btn in ipairs(HealLane.buttons or {}) do
+            if btn.sim then
+                btn.nh = 0
+                btn.hots = {}
+                btn.trackedHots = nil
+                btn.incoming = nil
+                btn.incomingSpell = nil
+                btn.incomingEnd = nil
+                btn.cast = 0
+                btn.debuff = nil
+                btn.debuffIconTexture = nil
+                btn.missingBuff = false
+            end
+        end
+    end
     HealLane.Refresh()
 end
 function HealLane.ResetPosition()

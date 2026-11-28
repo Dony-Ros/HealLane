@@ -21,7 +21,8 @@ local function HealAmount(spell)
     for i = 2, scanTip:NumLines() do
         local fs = _G["HealLaneScanTipTextLeft" .. i]
         local text = fs and fs:GetText()
-        if text and text:lower():find("heal") then
+        if type(text) == "string" and not HealLane.IsSecretValue(text)
+            and text:lower():find("heal") then
             text = text:gsub(",", "")
             local lo, hi = text:match("(%d+)%s+to%s+(%d+)")
             if lo then return (tonumber(lo) + tonumber(hi)) / 2 end
@@ -46,7 +47,7 @@ local function HotInfo(spell)
         for i = 2, scanTip:NumLines() do
             local fs = _G["HealLaneScanTipTextLeft" .. i]
             local text = fs and fs:GetText()
-            if text then
+            if type(text) == "string" and not HealLane.IsSecretValue(text) then
                 text = text:gsub(",", "")
                 local total, seconds = text:match("(%d+)%s+over%s+(%d+%.?%d*)%s+sec")
                 if total and tonumber(seconds) and tonumber(seconds) > 0 then

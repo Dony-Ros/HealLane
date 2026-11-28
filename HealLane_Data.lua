@@ -67,6 +67,9 @@ function HealLane.SimData(btn)
     btn.health = math.floor(btn.simHealth)
     -- Simulated HoTs
     btn.nh = i % 4
+    for k = 1, HealLane.MAX_HOTS do
+        btn.hots[k] = nil
+    end
     for k = 1, btn.nh do
         local h = btn.hots[k] or {}
         btn.hots[k] = h
